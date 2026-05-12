@@ -118,20 +118,65 @@ function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
 }
 
 function DevicePanel() {
+  const {
+    getInputDevices,
+    getOutputDevices,
+    getDefaultInput,
+    getDefaultOutput,
+    startInputDevice,
+    startOutputDevice,
+    stopAudioDevice,
+  } = useEngine()
+
   const [inputDevices, setInputDevices] = useState<string[]>([])
   const [outputDevices, setOutputDevices] = useState<string[]>([])
   const [selectedInput, setSelectedInput] = useState<string>('')
   const [selectedOutput, setSelectedOutput] = useState<string>('')
   const [networkHost, setNetworkHost] = useState('127.0.0.1')
   const [networkPort, setNetworkPort] = useState(6997)
+  const [isAudioRunning, setIsAudioRunning] = useState(false)
 
   useEffect(() => {
-    const devices = JSON.parse(localStorage.getItem('asiobridge_devices') || '{}')
-    setInputDevices(devices.input || [])
-    setOutputDevices(devices.output || [])
-    setSelectedInput(devices.selectedInput || '')
-    setSelectedOutput(devices.selectedOutput || '')
+    Promise.all([getInputDevices(), getOutputDevices()]).then(
+      ([input, output]) => {
+        setInputDevices(input)
+        setOutputDevices(output)
+        if (input.length > 0) {
+          getDefaultInput().then((d) => {
+            if (d) setSelectedInput(d)
+          })
+        }
+        if (output.length > 0) {
+          getDefaultOutput().then((d) => {
+            if (d) setSelectedOutput(d)
+          })
+        }
+      }
+    )
   }, [])
+
+  const handleStartAudio = async () => {
+    try {
+      if (selectedInput) {
+        await startInputDevice(selectedInput)
+      }
+      if (selectedOutput) {
+        await startOutputDevice(selectedOutput)
+      }
+      setIsAudioRunning(true)
+    } catch (e) {
+      console.error('Failed to start audio:', e)
+    }
+  }
+
+  const handleStopAudio = async () => {
+    try {
+      await stopAudioDevice()
+      setIsAudioRunning(false)
+    } catch (e) {
+      console.error('Failed to stop audio:', e)
+    }
+  }
 
   return (
     <Card>
@@ -197,6 +242,24 @@ function DevicePanel() {
               className="w-20"
             />
           </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={handleStartAudio}
+            disabled={isAudioRunning || inputDevices.length === 0 || outputDevices.length === 0}
+          >
+            Start Audio
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleStopAudio}
+            disabled={!isAudioRunning}
+          >
+            Stop Audio
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">

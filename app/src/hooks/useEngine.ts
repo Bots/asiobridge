@@ -60,6 +60,34 @@ export function useEngine() {
     })
   }
 
+  const getInputDevices = async (): Promise<string[]> => {
+    return invoke<string[]>('get_input_devices')
+  }
+
+  const getOutputDevices = async (): Promise<string[]> => {
+    return invoke<string[]>('get_output_devices')
+  }
+
+  const getDefaultInput = async (): Promise<string | null> => {
+    return invoke<string | null>('get_default_input')
+  }
+
+  const getDefaultOutput = async (): Promise<string | null> => {
+    return invoke<string | null>('get_default_output')
+  }
+
+  const startInputDevice = async (deviceName: string): Promise<string> => {
+    return invoke<string>('start_input_device', { deviceName })
+  }
+
+  const startOutputDevice = async (deviceName: string): Promise<string> => {
+    return invoke<string>('start_output_device', { deviceName })
+  }
+
+  const stopAudioDevice = async (): Promise<string> => {
+    return invoke<string>('stop_audio_device')
+  }
+
   return {
     getRacks,
     getConnections,
@@ -71,5 +99,12 @@ export function useEngine() {
     loadProfile,
     addConnection,
     removeConnection,
+    getInputDevices,
+    getOutputDevices,
+    getDefaultInput,
+    getDefaultOutput,
+    startInputDevice,
+    startOutputDevice,
+    stopAudioDevice,
   }
 }
