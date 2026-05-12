@@ -7,6 +7,7 @@ pub mod profile;
 pub mod engine;
 pub mod audio_stream;
 
+pub use audio_stream::AudioStream;
 pub use rack::{Channel, Rack, RackId, ChannelId};
 pub use mixer::Mixer;
 pub use connection::{Connection, ConnectionType};
