@@ -48,6 +48,7 @@ pub struct Channel {
   pub sample_rate: u32,
   pub bit_depth: u32,
   pub is_active: bool,
+  pub level: f32,
 }
 
 impl Rack {

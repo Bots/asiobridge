@@ -11,7 +11,6 @@ pub enum AudioCommand {
   StartInput(String),
   StartOutput(String),
   Stop,
-  WriteOutput(Vec<f32>),
 }
 
 /// Audio manager runs on a dedicated thread and handles all cpal audio I/O
@@ -52,6 +51,7 @@ impl AudioManagerHandle {
               buffer_size,
               rb_input_rb.clone(),
               engine.clone(),
+              rb_output_rb.clone(),
             ) {
               error!("Input error: {}", e);
             }
@@ -76,13 +76,6 @@ impl AudioManagerHandle {
               let _ = stream.pause();
             }
           }
-          AudioCommand::WriteOutput(samples) => {
-            let (mut prod, _) = rb_output_rb.clone().split();
-            for &sample in &samples {
-              let _ = prod.try_push(sample);
-            }
-            drop(prod);
-          }
         }
       }
     });
@@ -103,6 +96,7 @@ impl AudioManagerHandle {
     buffer_size: usize,
     input_rb: Arc<HeapRb<f32>>,
     engine: Arc<Mutex<AudioEngine>>,
+    output_rb: Arc<HeapRb<f32>>,
   ) -> Result<(), String> {
     let host = cpal::default_host();
     let device = Self::find_device(&host, device_name).ok_or_else(|| {
@@ -129,6 +123,7 @@ impl AudioManagerHandle {
 
     let input_rb = input_rb.clone();
     let engine = engine.clone();
+    let output_rb = output_rb.clone();
 
     let new_stream = device
       .build_input_stream(
@@ -140,9 +135,17 @@ impl AudioManagerHandle {
           }
           drop(prod);
 
-          if let Ok(engine_lock) = engine.lock() {
-            let _ = engine_lock.process_audio(data);
+          let processed = if let Ok(engine_lock) = engine.lock() {
+            engine_lock.process_audio(data)
+          } else {
+            data.to_vec()
+          };
+
+          let (mut prod, _) = output_rb.clone().split();
+          for &sample in &processed {
+            let _ = prod.try_push(sample);
           }
+          drop(prod);
         },
         move |err| {
           error!("Input stream error: {}", err);

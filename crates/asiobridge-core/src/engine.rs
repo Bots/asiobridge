@@ -1,4 +1,4 @@
-use crate::connection::Connection;
+use crate::connection::{Connection, ConnectionType};
 use crate::mixer::Mixer;
 use crate::network::NetworkStream;
 use crate::profile::{Profile, ProfileManager};
@@ -127,7 +127,8 @@ impl AudioEngine {
       return input.to_vec();
     }
 
-    let mut output = vec![0.0f32; input.len()];
+    let num_channels = input.len();
+    let mut output = vec![0.0f32; num_channels];
 
     for connection in &self.connections {
       if !connection.is_active {
@@ -176,13 +177,37 @@ impl AudioEngine {
         continue;
       }
 
-      if source_channel.sample_rate != dest_channel.sample_rate {
-        warn!(
-          "Sample rate mismatch: {}Hz -> {}Hz",
-          source_channel.sample_rate, dest_channel.sample_rate
-        );
-        let resampled = self.resampler.resample(input);
-        output = resampled;
+      let gain = source_channel.level;
+
+      match connection.connection_type {
+        ConnectionType::Direct => {
+          if source_ch < input.len() {
+            output[dest_ch] = input[source_ch] * gain;
+          }
+        }
+        ConnectionType::Network => {
+          if source_ch < input.len() {
+            output[dest_ch] = input[source_ch] * gain;
+          }
+        }
+        ConnectionType::Wdm => {
+          if source_ch < input.len() {
+            output[dest_ch] = input[source_ch] * gain;
+          }
+        }
+        ConnectionType::Null => {
+          continue;
+        }
+        ConnectionType::MultiClient => {
+          for i in 0..std::cmp::min(input.len(), num_channels) {
+            output[i] += input[i % input.len()] * gain;
+          }
+        }
+        ConnectionType::Vst | ConnectionType::Midi => {
+          if source_ch < input.len() {
+            output[dest_ch] = input[source_ch] * gain;
+          }
+        }
       }
     }
 

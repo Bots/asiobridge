@@ -53,6 +53,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: true,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -65,6 +66,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: true,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -77,6 +79,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: true,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -89,6 +92,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: false,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -101,6 +105,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: false,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -113,6 +118,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: false,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -125,6 +131,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: false,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -137,6 +144,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: false,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
@@ -149,6 +157,7 @@ fn main() {
                                 sample_rate: 44100,
                                 bit_depth: 24,
                                 is_active: true,
+                                level: 1.0,
                             })
                             .collect(),
                     ),
