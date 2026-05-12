@@ -129,6 +129,9 @@ function DevicePanel() {
     startNetworkStream,
     stopNetworkStream,
     getNetworkStreamConfig,
+    startRecording,
+    stopRecording,
+    getRecordingStatus,
   } = useEngine()
 
   const [inputDevices, setInputDevices] = useState<string[]>([])
@@ -139,6 +142,7 @@ function DevicePanel() {
   const [networkPort, setNetworkPort] = useState(6997)
   const [isAudioRunning, setIsAudioRunning] = useState(false)
   const [isNetworkStreaming, setIsNetworkStreaming] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
 
   useEffect(() => {
     Promise.all([getInputDevices(), getOutputDevices()]).then(
@@ -162,6 +166,10 @@ function DevicePanel() {
       setNetworkHost(config.host)
       setNetworkPort(config.port)
       setIsNetworkStreaming(config.is_active)
+    })
+
+    getRecordingStatus().then((status) => {
+      setIsRecording(status.is_recording)
     })
   }, [])
 
@@ -203,6 +211,24 @@ function DevicePanel() {
       setIsNetworkStreaming(false)
     } catch (e) {
       console.error('Failed to stop network stream:', e)
+    }
+  }
+
+  const handleStartRecording = async () => {
+    try {
+      await startRecording('')
+      setIsRecording(true)
+    } catch (e) {
+      console.error('Failed to start recording:', e)
+    }
+  }
+
+  const handleStopRecording = async () => {
+    try {
+      await stopRecording()
+      setIsRecording(false)
+    } catch (e) {
+      console.error('Failed to stop recording:', e)
     }
   }
 
@@ -310,6 +336,23 @@ function DevicePanel() {
         <div className="flex items-center gap-2">
           <Badge variant="outline">cpal backend</Badge>
           <Badge variant="outline">ASIO (Windows)</Badge>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Recording</Label>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={isRecording ? handleStopRecording : handleStartRecording}
+              disabled={false}
+              variant={isRecording ? 'default' : 'destructive'}
+            >
+              {isRecording ? '⏹ Stop Rec' : '⏺ Start Rec'}
+            </Button>
+            <Badge variant={isRecording ? 'default' : 'outline'}>
+              {isRecording ? '● Recording' : '○ Ready'}
+            </Badge>
+          </div>
         </div>
       </CardContent>
     </Card>

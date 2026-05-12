@@ -191,6 +191,9 @@ fn main() {
             commands::start_network_stream,
             commands::stop_network_stream,
             commands::get_network_stream_config,
+            commands::start_recording,
+            commands::stop_recording,
+            commands::get_recording_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AsioBridge");

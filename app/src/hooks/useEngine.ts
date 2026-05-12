@@ -104,6 +104,18 @@ export function useEngine() {
     return invoke<{ host: string; port: number; is_active: boolean }>('get_network_stream_config')
   }
 
+  const startRecording = async (outputDir: string): Promise<boolean> => {
+    return invoke<boolean>('start_recording', { outputDir })
+  }
+
+  const stopRecording = async (): Promise<boolean> => {
+    return invoke<boolean>('stop_recording')
+  }
+
+  const getRecordingStatus = async (): Promise<{ is_recording: boolean; output_dir: string }> => {
+    return invoke<{ is_recording: boolean; output_dir: string }>('get_recording_status')
+  }
+
   return {
     getRacks,
     getConnections,
@@ -114,6 +126,9 @@ export function useEngine() {
     startNetworkStream,
     stopNetworkStream,
     getNetworkStreamConfig,
+    startRecording,
+    stopRecording,
+    getRecordingStatus,
     setSampleRate,
     saveProfile,
     loadProfile,

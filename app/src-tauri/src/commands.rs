@@ -285,3 +285,35 @@ pub fn get_network_stream_config(
         is_active: stream.is_active,
     })
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RecordingStatus {
+    pub is_recording: bool,
+    pub output_dir: String,
+}
+
+#[tauri::command]
+pub fn start_recording(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+    output_dir: String,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    // Recording would be handled by the recorder module
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn stop_recording(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    // Recording would be handled by the recorder module
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn get_recording_status(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<RecordingStatus, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    Ok(RecordingStatus {
+        is_recording: false,
+        output_dir: " recordings".to_string(),
+    })
+}
