@@ -6,7 +6,7 @@ pub mod network;
 pub mod profile;
 pub mod engine;
 
-pub use rack::{Rack, RackId, ChannelId};
+pub use rack::{Channel, Rack, RackId, ChannelId};
 pub use mixer::Mixer;
 pub use connection::{Connection, ConnectionType};
 pub use resampler::Resampler;

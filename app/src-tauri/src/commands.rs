@@ -1,0 +1,174 @@
+use asiobridge_core::{
+    AudioEngine, Connection, ConnectionType, NetworkStream, Rack, RackId,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use tauri::State;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChannelState {
+    pub id: u32,
+    pub name: String,
+    pub active: bool,
+    pub level: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RackState {
+    pub id: String,
+    pub name: String,
+    pub channels: Vec<ChannelState>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConnectionState {
+    pub source_rack: String,
+    pub source_channel: u32,
+    pub dest_rack: String,
+    pub dest_channel: u32,
+    pub connection_type: String,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EngineConfig {
+    pub sample_rate: u32,
+    pub bit_depth: u32,
+    pub channels: u16,
+}
+
+#[tauri::command]
+pub fn get_racks(engine: State<Mutex<AudioEngine>>) -> Result<Vec<RackState>, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    let racks = engine.get_racks();
+    let states: Vec<RackState> = racks
+        .values()
+        .map(|rack| RackState {
+            id: rack.id.to_string(),
+            name: rack.id.to_string(),
+            channels: rack
+                .channels
+                .iter()
+                .map(|ch| ChannelState {
+                    id: ch.id.0,
+                    name: ch.name.clone(),
+                    active: ch.is_active,
+                    level: 0.8,
+                })
+                .collect(),
+        })
+        .collect();
+    Ok(states)
+}
+
+#[tauri::command]
+pub fn get_connections(engine: State<Mutex<AudioEngine>>) -> Result<Vec<ConnectionState>, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    let connections = engine.get_connections();
+    let states: Vec<ConnectionState> = connections
+        .iter()
+        .map(|c| ConnectionState {
+            source_rack: c.source_rack.clone(),
+            source_channel: c.source_channel,
+            dest_rack: c.dest_rack.clone(),
+            dest_channel: c.dest_channel,
+            connection_type: c.connection_type.to_string(),
+            is_active: c.is_active,
+        })
+        .collect();
+    Ok(states)
+}
+
+#[tauri::command]
+pub fn start_engine(engine: State<Mutex<AudioEngine>>) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.start();
+    Ok(engine.is_running())
+}
+
+#[tauri::command]
+pub fn stop_engine(engine: State<Mutex<AudioEngine>>) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.stop();
+    Ok(!engine.is_running())
+}
+
+#[tauri::command]
+pub fn get_engine_config(engine: State<Mutex<AudioEngine>>) -> Result<EngineConfig, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    Ok(EngineConfig {
+        sample_rate: engine.get_sample_rate(),
+        bit_depth: engine.get_bit_depth(),
+        channels: engine.get_channel_count(),
+    })
+}
+
+#[tauri::command]
+pub fn set_sample_rate(
+    engine: State<Mutex<AudioEngine>>,
+    sample_rate: u32,
+) -> Result<u32, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.set_sample_rate(sample_rate);
+    Ok(engine.get_sample_rate())
+}
+
+#[tauri::command]
+pub fn save_profile(
+    engine: State<Mutex<AudioEngine>>,
+    slot: usize,
+    name: String,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.save_profile(slot, &name);
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn load_profile(engine: State<Mutex<AudioEngine>>, slot: usize) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    Ok(engine.load_profile(slot))
+}
+
+#[tauri::command]
+pub fn add_connection(
+    engine: State<Mutex<AudioEngine>>,
+    source_rack: String,
+    source_channel: u32,
+    dest_rack: String,
+    dest_channel: u32,
+    connection_type: String,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    let conn_type = match connection_type.as_str() {
+        "Direct" => ConnectionType::Direct,
+        "Network" => ConnectionType::Network,
+        "Wdm" => ConnectionType::Wdm,
+        "Null" => ConnectionType::Null,
+        "MultiClient" => ConnectionType::MultiClient,
+        "Vst" => ConnectionType::Vst,
+        "Midi" => ConnectionType::Midi,
+        _ => ConnectionType::Direct,
+    };
+    let connection = Connection {
+        source_rack,
+        source_channel,
+        dest_rack,
+        dest_channel,
+        connection_type: conn_type,
+        is_active: true,
+    };
+    engine.add_connection(connection);
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn remove_connection(
+    engine: State<Mutex<AudioEngine>>,
+    source_rack: String,
+    source_channel: u32,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.remove_connection(&source_rack, source_channel);
+    Ok(true)
+}
