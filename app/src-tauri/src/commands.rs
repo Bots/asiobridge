@@ -1,6 +1,7 @@
 use asiobridge_core::{
     AudioEngine, Connection, ConnectionType,
 };
+use crate::audio_manager::{AudioCommand, AudioManagerHandle};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::State;
@@ -171,4 +172,51 @@ pub fn remove_connection(
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     engine.remove_connection(&source_rack, source_channel);
     Ok(true)
+}
+
+#[tauri::command]
+pub fn get_input_devices(device: State<AudioManagerHandle>) -> Result<Vec<String>, String> {
+    Ok(device.get_input_devices_sync())
+}
+
+#[tauri::command]
+pub fn get_output_devices(device: State<AudioManagerHandle>) -> Result<Vec<String>, String> {
+    Ok(device.get_output_devices_sync())
+}
+
+#[tauri::command]
+pub fn get_default_input(device: State<AudioManagerHandle>) -> Result<Option<String>, String> {
+    Ok(device.get_default_input_sync())
+}
+
+#[tauri::command]
+pub fn get_default_output(device: State<AudioManagerHandle>) -> Result<Option<String>, String> {
+    Ok(device.get_default_output_sync())
+}
+
+#[tauri::command]
+pub fn start_input_device(
+    device: State<AudioManagerHandle>,
+    device_name: String,
+) -> Result<String, String> {
+    device
+        .send_command(AudioCommand::StartInput(device_name))
+        .map(|_| "Input started".to_string())
+}
+
+#[tauri::command]
+pub fn start_output_device(
+    device: State<AudioManagerHandle>,
+    device_name: String,
+) -> Result<String, String> {
+    device
+        .send_command(AudioCommand::StartOutput(device_name))
+        .map(|_| "Output started".to_string())
+}
+
+#[tauri::command]
+pub fn stop_audio_device(device: State<AudioManagerHandle>) -> Result<String, String> {
+    device
+        .send_command(AudioCommand::Stop)
+        .map(|_| "Audio stopped".to_string())
 }

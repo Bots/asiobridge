@@ -171,6 +171,13 @@ fn main() {
             commands::load_profile,
             commands::add_connection,
             commands::remove_connection,
+            commands::get_input_devices,
+            commands::get_output_devices,
+            commands::get_default_input,
+            commands::get_default_output,
+            commands::start_input_device,
+            commands::start_output_device,
+            commands::stop_audio_device,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AsioBridge");
