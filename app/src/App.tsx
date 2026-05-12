@@ -116,6 +116,41 @@ function RackView({ rack }: { rack: RackState }) {
   )
 }
 
+function MixerView({ channels }: { channels: RackState['channels'] }) {
+  return (
+    <Card>
+      <CardHeader className="p-3">
+        <CardTitle className="text-sm">Mixer</CardTitle>
+      </CardHeader>
+      <CardContent className="p-3">
+        <div className="flex items-end justify-between gap-2 overflow-x-auto pb-2">
+          {channels.map((channel) => (
+            <div key={channel.id} className="flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground">{channel.name}</span>
+              <div className="relative h-48 w-8 rounded-lg bg-muted p-1">
+                <div className="absolute bottom-0 left-0 right-0 rounded-sm bg-gradient-to-t from-green-500 via-yellow-400 to-red-500 transition-all"
+                  style={{ height: `${channel.level * 100}%` }}
+                />
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={channel.level}
+                  className="absolute inset-0 h-48 w-8 opacity-0 cursor-pointer"
+                  style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground">{Math.round(channel.level * 100)}%</span>
+              <Switch checked={channel.active} />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
   const rackIds = [
     'asio-driver-in',
@@ -538,6 +573,12 @@ function App() {
             <RackView key={rack.id} rack={rack} />
           ))}
         </div>
+
+        {racks.find(r => r.id === 'mix-out') && (
+          <div className="mb-4">
+            <MixerView channels={racks.find(r => r.id === 'mix-out')!.channels} />
+          </div>
+        )}
 
         <div className="mb-4 grid grid-cols-2 gap-4">
           <DevicePanel />
