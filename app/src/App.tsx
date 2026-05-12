@@ -1,99 +1,16 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import { useEngine } from '@/hooks/useEngine'
+import type { RackState, ConnectionState, EngineConfig } from '@/types/engine'
 
-type RackType = 'asio-driver-in' | 'asio-driver-out' | 'asio-host-in' | 'network-in' | 'network-out' | 'looper-in' | 'looper-out' | 'wdm-in' | 'mix-out'
+const SAMPLE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
+const BIT_DEPTHS = [16, 24, 32]
 
-interface Channel {
-  id: number
-  name: string
-  active: boolean
-  level: number
-}
-
-interface Rack {
-  id: RackType
-  name: string
-  channels: Channel[]
-}
-
-const RACKS: Rack[] = [
-  {
-    id: 'asio-driver-in',
-    name: 'ASIO Driver IN',
-    channels: Array.from({ length: 8 }, (_, i) => ({
-      id: i,
-      name: `IN ${i + 1}`,
-      active: true,
-      level: 0.8,
-    })),
-  },
-  {
-    id: 'asio-driver-out',
-    name: 'ASIO Driver OUT/MIX',
-    channels: Array.from({ length: 8 }, (_, i) => ({
-      id: i,
-      name: `OUT ${i + 1}`,
-      active: true,
-      level: 0.8,
-    })),
-  },
-  {
-    id: 'asio-host-in',
-    name: 'ASIO Host IN/MIX',
-    channels: Array.from({ length: 8 }, (_, i) => ({
-      id: i,
-      name: `HOST ${i + 1}`,
-      active: true,
-      level: 0.8,
-    })),
-  },
-  {
-    id: 'network-in',
-    name: 'Network IN',
-    channels: Array.from({ length: 4 }, (_, i) => ({
-      id: i,
-      name: `NET-IN ${i + 1}`,
-      active: false,
-      level: 0.0,
-    })),
-  },
-  {
-    id: 'network-out',
-    name: 'Network OUT',
-    channels: Array.from({ length: 4 }, (_, i) => ({
-      id: i,
-      name: `NET-OUT ${i + 1}`,
-      active: false,
-      level: 0.0,
-    })),
-  },
-  {
-    id: 'wdm-in',
-    name: 'WDM IN',
-    channels: Array.from({ length: 8 }, (_, i) => ({
-      id: i,
-      name: `WDM ${i + 1}`,
-      active: false,
-      level: 0.0,
-    })),
-  },
-  {
-    id: 'mix-out',
-    name: 'Mix OUT',
-    channels: Array.from({ length: 8 }, (_, i) => ({
-      id: i,
-      name: `MIX ${i + 1}`,
-      active: true,
-      level: 0.8,
-    })),
-  },
-]
-
-const RACK_COLORS: Record<RackType, string> = {
+const RACK_COLORS: Record<string, string> = {
   'asio-driver-in': 'border-blue-500',
   'asio-driver-out': 'border-green-500',
   'asio-host-in': 'border-purple-500',
@@ -105,7 +22,7 @@ const RACK_COLORS: Record<RackType, string> = {
   'mix-out': 'border-cyan-500',
 }
 
-function ChannelStrip({ channel, rackId }: { channel: Channel; rackId: RackType }) {
+function ChannelStrip({ channel }: { channel: RackState['channels'][0] }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <span className="text-xs text-muted-foreground">{channel.name}</span>
@@ -115,65 +32,73 @@ function ChannelStrip({ channel, rackId }: { channel: Channel; rackId: RackType 
           max={1}
           step={0.01}
           className="h-48 rotate-180"
-          onValueChange={([v]) => {
-            console.log(`[${rackId}] Ch${channel.id} level: ${v}`)
-          }}
         />
         <span className="text-xs text-muted-foreground">{Math.round(channel.level * 100)}%</span>
       </div>
-      <Switch
-        checked={channel.active}
-        onCheckedChange={(checked) => {
-          console.log(`[${rackId}] Ch${channel.id} ${checked ? 'ON' : 'OFF'}`)
-        }}
-      />
+      <Switch checked={channel.active} />
     </div>
   )
 }
 
-function RackView({ rack }: { rack: Rack }) {
+function RackView({ rack }: { rack: RackState }) {
   const colorClass = RACK_COLORS[rack.id] || 'border-gray-500'
 
   return (
-    <Card className={cn('w-48', colorClass)}>
+    <Card className={cn('w-48 shrink-0', colorClass)}>
       <CardHeader className="p-3">
         <CardTitle className="text-xs">{rack.name}</CardTitle>
       </CardHeader>
       <CardContent className="flex justify-between p-3">
         {rack.channels.map((ch) => (
-          <ChannelStrip key={ch.id} channel={ch} rackId={rack.id} />
+          <ChannelStrip key={ch.id} channel={ch} />
         ))}
       </CardContent>
     </Card>
   )
 }
 
-function ConnectionMatrix() {
+function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
+  const rackIds = [
+    'asio-driver-in',
+    'asio-driver-out',
+    'asio-host-in',
+    'network-in',
+    'network-out',
+    'mix-out',
+  ]
+  const rackNames = rackIds.map((id) => id.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' '))
+
   return (
     <Card>
       <CardHeader className="p-3">
         <CardTitle className="text-sm">Connection Matrix</CardTitle>
       </CardHeader>
       <CardContent className="p-3">
-        <div className="grid grid-cols-7 gap-1 text-center text-xs">
+        <div className="grid gap-1" style={{ gridTemplateColumns: `auto repeat(${rackIds.length}, auto)` }}>
           <div></div>
-          {RACKS.slice(0, 6).map((r) => (
-            <div key={r.id} className="text-muted-foreground">{r.name.split(' ')[0]}</div>
+          {rackNames.map((name, i) => (
+            <div key={i} className="text-center text-xs text-muted-foreground">{name}</div>
           ))}
-          {RACKS.slice(0, 6).map((src) => (
-            <React.Fragment key={src.id}>
-              <div className="text-muted-foreground">{src.name.split(' ')[0]}</div>
-              {RACKS.slice(0, 6).map((dst) => (
-                <div key={dst.id} className="h-8 w-8 rounded bg-secondary">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-full w-full p-0 text-[8px]"
-                  >
-                    {src.id === dst.id ? 'X' : '→'}
-                  </Button>
-                </div>
-              ))}
+          {rackIds.map((srcId, srcIdx) => (
+            <React.Fragment key={srcId}>
+              <div className="text-center text-xs text-muted-foreground">{rackNames[srcIdx]}</div>
+              {rackIds.map((dstId) => {
+                const conn = connections.find(
+                  (c) => c.source_rack === srcId && c.dest_rack === dstId
+                )
+                const isActive = conn?.is_active ?? false
+                return (
+                  <div key={dstId} className="h-8 w-8">
+                    <Button
+                      variant={isActive ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-full w-full text-[8px]"
+                    >
+                      {srcId === dstId ? 'X' : '→'}
+                    </Button>
+                  </div>
+                )
+              })}
             </React.Fragment>
           ))}
         </div>
@@ -182,40 +107,77 @@ function ConnectionMatrix() {
   )
 }
 
-function StatusBar() {
-  return (
-    <div className="flex items-center justify-between border-t bg-card px-4 py-2 text-xs">
-      <div className="flex items-center gap-4">
-        <span className="text-muted-foreground">Sample Rate: 44100 Hz</span>
-        <span className="text-muted-foreground">Bit Depth: 24 bit</span>
-        <span className="text-muted-foreground">Channels: 2</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm">Save Profile</Button>
-        <Button variant="outline" size="sm">Load Profile</Button>
-        <Button size="sm">Start</Button>
-      </div>
-    </div>
-  )
-}
-
 function App() {
+  const {
+    getRacks,
+    getConnections,
+    getEngineConfig,
+    startEngine,
+    stopEngine,
+    setSampleRate,
+    saveProfile,
+    loadProfile,
+  } = useEngine()
+
+  const [racks, setRacks] = useState<RackState[]>([])
+  const [connections, setConnections] = useState<ConnectionState[]>([])
+  const [config, setConfig] = useState<EngineConfig | null>(null)
+  const [isRunning, setIsRunning] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState(0)
+
+  useEffect(() => {
+    Promise.all([getRacks(), getConnections(), getEngineConfig()]).then(
+      ([racksData, connsData, configData]) => {
+        setRacks(racksData)
+        setConnections(connsData)
+        setConfig(configData)
+      }
+    )
+  }, [])
+
+  const handleStartStop = async () => {
+    if (isRunning) {
+      const stopped = await stopEngine()
+      setIsRunning(stopped)
+    } else {
+      const started = await startEngine()
+      setIsRunning(started)
+    }
+  }
+
+  const handleSampleRateChange = async (rate: number) => {
+    await setSampleRate(rate)
+    const configData = await getEngineConfig()
+    setConfig(configData)
+  }
+
+  const handleSaveProfile = async () => {
+    await saveProfile(selectedProfile, `Profile ${selectedProfile + 1}`)
+  }
+
+  const handleLoadProfile = async () => {
+    await loadProfile(selectedProfile)
+    const racksData = await getRacks()
+    setRacks(racksData)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">AsioBridge</h1>
           <div className="flex items-center gap-2">
-            <select className="rounded border bg-background px-2 py-1 text-sm">
-              <option>Profile 1</option>
-              <option>Profile 2</option>
-              <option>Profile 3</option>
-              <option>Profile 4</option>
-              <option>Profile 5</option>
-              <option>Profile 6</option>
-              <option>Profile 7</option>
-              <option>Profile 8</option>
+            <select
+              className="rounded border bg-background px-2 py-1 text-sm"
+              value={selectedProfile}
+              onChange={(e) => setSelectedProfile(Number(e.target.value))}
+            >
+              {Array.from({ length: 8 }, (_, i) => (
+                <option key={i} value={i}>Profile {i + 1}</option>
+              ))}
             </select>
+            <Button variant="outline" size="sm" onClick={handleSaveProfile}>Save</Button>
+            <Button variant="outline" size="sm" onClick={handleLoadProfile}>Load</Button>
           </div>
         </div>
       </header>
@@ -224,26 +186,53 @@ function App() {
         <div className="mb-4 flex gap-2">
           <select className="rounded border bg-background px-2 py-1 text-sm">
             <option>ASIO: AsioBridge Virtual Driver</option>
-            <option>ASIO: Steinberg ASIO</option>
+          </select>
+          <select
+            className="rounded border bg-background px-2 py-1 text-sm"
+            value={config?.sample_rate ?? 44100}
+            onChange={(e) => handleSampleRateChange(Number(e.target.value))}
+          >
+            {SAMPLE_RATES.map((rate) => (
+              <option key={rate} value={rate}>{rate} Hz</option>
+            ))}
           </select>
           <select className="rounded border bg-background px-2 py-1 text-sm">
-            <option>44100 Hz</option>
-            <option>48000 Hz</option>
-            <option>88200 Hz</option>
-            <option>96000 Hz</option>
+            {BIT_DEPTHS.map((bits) => (
+              <option key={bits} value={bits}>{bits} bit</option>
+            ))}
           </select>
         </div>
 
-        <div className="mb-4 flex gap-4 overflow-x-auto">
-          {RACKS.map((rack) => (
+        <div className="mb-4 flex gap-4 overflow-x-auto pb-4">
+          {racks.map((rack) => (
             <RackView key={rack.id} rack={rack} />
           ))}
         </div>
 
-        <ConnectionMatrix />
+        <ConnectionMatrix connections={connections} />
       </main>
 
-      <StatusBar />
+      <footer className="border-t bg-card px-4 py-2">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-4">
+            <span className="text-muted-foreground">
+              Sample Rate: {config?.sample_rate ?? '---'} Hz
+            </span>
+            <span className="text-muted-foreground">
+              Bit Depth: {config?.bit_depth ?? '---'} bit
+            </span>
+            <span className="text-muted-foreground">
+              Channels: {config?.channels ?? '---'}
+            </span>
+            <span className={isRunning ? 'text-green-500' : 'text-red-500'}>
+              {isRunning ? '● Running' : '○ Stopped'}
+            </span>
+          </div>
+          <Button size="sm" onClick={handleStartStop} variant={isRunning ? 'destructive' : 'default'}>
+            {isRunning ? 'Stop' : 'Start'}
+          </Button>
+        </div>
+      </footer>
     </div>
   )
 }
