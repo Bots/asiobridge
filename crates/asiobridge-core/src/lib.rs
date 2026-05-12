@@ -6,6 +6,7 @@ pub mod network;
 pub mod profile;
 pub mod engine;
 pub mod audio_stream;
+pub mod recorder;
 
 pub use audio_stream::AudioStream;
 pub use rack::{Channel, Rack, RackId, ChannelId};
@@ -15,3 +16,4 @@ pub use resampler::Resampler;
 pub use network::NetworkStream;
 pub use profile::{Profile, ProfileManager};
 pub use engine::AudioEngine;
+pub use recorder::AudioRecorder;
