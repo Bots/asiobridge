@@ -241,3 +241,47 @@ pub fn get_engine_status(
         channels: engine.get_channel_count(),
     })
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NetworkStreamConfig {
+    pub host: String,
+    pub port: u16,
+    pub is_active: bool,
+}
+
+#[tauri::command]
+pub fn start_network_stream(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+    host: String,
+    port: u16,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    let stream = asiobridge_core::NetworkStream::new(host, port);
+    engine.add_network_stream(stream);
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn stop_network_stream(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.clear_network_streams();
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn get_network_stream_config(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+) -> Result<NetworkStreamConfig, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    let streams = engine.get_network_streams();
+    let stream = streams.first().cloned().unwrap_or_else(|| {
+        asiobridge_core::NetworkStream::new("127.0.0.1".to_string(), 6997)
+    });
+    Ok(NetworkStreamConfig {
+        host: stream.host,
+        port: stream.port,
+        is_active: stream.is_active,
+    })
+}

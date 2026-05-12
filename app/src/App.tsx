@@ -126,6 +126,9 @@ function DevicePanel() {
     startInputDevice,
     startOutputDevice,
     stopAudioDevice,
+    startNetworkStream,
+    stopNetworkStream,
+    getNetworkStreamConfig,
   } = useEngine()
 
   const [inputDevices, setInputDevices] = useState<string[]>([])
@@ -135,6 +138,7 @@ function DevicePanel() {
   const [networkHost, setNetworkHost] = useState('127.0.0.1')
   const [networkPort, setNetworkPort] = useState(6997)
   const [isAudioRunning, setIsAudioRunning] = useState(false)
+  const [isNetworkStreaming, setIsNetworkStreaming] = useState(false)
 
   useEffect(() => {
     Promise.all([getInputDevices(), getOutputDevices()]).then(
@@ -153,6 +157,12 @@ function DevicePanel() {
         }
       }
     )
+
+    getNetworkStreamConfig().then((config) => {
+      setNetworkHost(config.host)
+      setNetworkPort(config.port)
+      setIsNetworkStreaming(config.is_active)
+    })
   }, [])
 
   const handleStartAudio = async () => {
@@ -175,6 +185,24 @@ function DevicePanel() {
       setIsAudioRunning(false)
     } catch (e) {
       console.error('Failed to stop audio:', e)
+    }
+  }
+
+  const handleStartNetworkStream = async () => {
+    try {
+      await startNetworkStream(networkHost, networkPort)
+      setIsNetworkStreaming(true)
+    } catch (e) {
+      console.error('Failed to start network stream:', e)
+    }
+  }
+
+  const handleStopNetworkStream = async () => {
+    try {
+      await stopNetworkStream()
+      setIsNetworkStreaming(false)
+    } catch (e) {
+      console.error('Failed to stop network stream:', e)
     }
   }
 
@@ -226,23 +254,40 @@ function DevicePanel() {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label>Network Streaming</Label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="127.0.0.1"
-              value={networkHost}
-              onChange={(e) => setNetworkHost(e.target.value)}
-            />
-            <Input
-              type="number"
-              placeholder="6997"
-              value={networkPort}
-              onChange={(e) => setNetworkPort(Number(e.target.value))}
-              className="w-20"
-            />
+<div className="space-y-2">
+            <Label>Network Streaming</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="127.0.0.1"
+                value={networkHost}
+                onChange={(e) => setNetworkHost(e.target.value)}
+              />
+              <Input
+                type="number"
+                placeholder="6997"
+                value={networkPort}
+                onChange={(e) => setNetworkPort(Number(e.target.value))}
+                className="w-20"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleStartNetworkStream}
+                disabled={isNetworkStreaming}
+              >
+                Start Stream
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStopNetworkStream}
+                disabled={!isNetworkStreaming}
+              >
+                Stop Stream
+              </Button>
+            </div>
           </div>
-        </div>
 
         <div className="flex gap-2">
           <Button

@@ -188,6 +188,9 @@ fn main() {
             commands::start_output_device,
             commands::stop_audio_device,
             commands::get_engine_status,
+            commands::start_network_stream,
+            commands::stop_network_stream,
+            commands::get_network_stream_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AsioBridge");

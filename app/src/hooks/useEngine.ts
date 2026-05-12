@@ -92,6 +92,18 @@ export function useEngine() {
     return invoke<EngineStatus>('get_engine_status')
   }
 
+  const startNetworkStream = async (host: string, port: number): Promise<boolean> => {
+    return invoke<boolean>('start_network_stream', { host, port })
+  }
+
+  const stopNetworkStream = async (): Promise<boolean> => {
+    return invoke<boolean>('stop_network_stream')
+  }
+
+  const getNetworkStreamConfig = async (): Promise<{ host: string; port: number; is_active: boolean }> => {
+    return invoke<{ host: string; port: number; is_active: boolean }>('get_network_stream_config')
+  }
+
   return {
     getRacks,
     getConnections,
@@ -99,6 +111,9 @@ export function useEngine() {
     stopEngine,
     getEngineConfig,
     getEngineStatus,
+    startNetworkStream,
+    stopNetworkStream,
+    getNetworkStreamConfig,
     setSampleRate,
     saveProfile,
     loadProfile,

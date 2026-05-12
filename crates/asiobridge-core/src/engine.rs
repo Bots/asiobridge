@@ -98,6 +98,14 @@ impl AudioEngine {
     self.network_streams.push(stream);
   }
 
+  pub fn get_network_streams(&self) -> &[NetworkStream] {
+    &self.network_streams
+  }
+
+  pub fn clear_network_streams(&mut self) {
+    self.network_streams.clear();
+  }
+
   pub fn start(&mut self) {
     if self.is_running {
       warn!("Audio engine already running");
