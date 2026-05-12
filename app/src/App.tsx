@@ -127,10 +127,15 @@ function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
   ]
   const rackNames = rackIds.map((id) => id.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' '))
 
+  const activeConnections = connections.filter(c => c.is_active).length
+
   return (
     <Card>
       <CardHeader className="p-3">
-        <CardTitle className="text-sm">Connection Matrix</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm">Connection Matrix</CardTitle>
+          <Badge variant="outline">{activeConnections} active</Badge>
+        </div>
       </CardHeader>
       <CardContent className="p-3">
         <div className="grid gap-1" style={{ gridTemplateColumns: `auto repeat(${rackIds.length}, auto)` }}>
@@ -151,7 +156,10 @@ function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
                     <Button
                       variant={isActive ? 'default' : 'outline'}
                       size="sm"
-                      className="h-full w-full text-[8px]"
+                      className={cn(
+                        'h-full w-full text-[8px] transition-all',
+                        isActive ? 'scale-105 shadow-sm' : 'hover:scale-105'
+                      )}
                     >
                       {srcId === dstId ? 'X' : '→'}
                     </Button>
