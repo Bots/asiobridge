@@ -3,6 +3,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useEngine } from '@/hooks/useEngine'
 import type { RackState, ConnectionState, EngineConfig } from '@/types/engine'
@@ -107,6 +117,97 @@ function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
   )
 }
 
+function DevicePanel() {
+  const [inputDevices, setInputDevices] = useState<string[]>([])
+  const [outputDevices, setOutputDevices] = useState<string[]>([])
+  const [selectedInput, setSelectedInput] = useState<string>('')
+  const [selectedOutput, setSelectedOutput] = useState<string>('')
+  const [networkHost, setNetworkHost] = useState('127.0.0.1')
+  const [networkPort, setNetworkPort] = useState(6997)
+
+  useEffect(() => {
+    const devices = JSON.parse(localStorage.getItem('asiobridge_devices') || '{}')
+    setInputDevices(devices.input || [])
+    setOutputDevices(devices.output || [])
+    setSelectedInput(devices.selectedInput || '')
+    setSelectedOutput(devices.selectedOutput || '')
+  }, [])
+
+  return (
+    <Card>
+      <CardHeader className="p-3">
+        <CardTitle className="text-sm">Device Configuration</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 p-3">
+        <div className="space-y-2">
+          <Label>Input Device</Label>
+          <Select value={selectedInput} onValueChange={setSelectedInput}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select input device" />
+            </SelectTrigger>
+            <SelectContent>
+              {inputDevices.map((device) => (
+                <SelectItem key={device} value={device}>
+                  {device}
+                </SelectItem>
+              ))}
+              {inputDevices.length === 0 && (
+                <SelectItem value="none" disabled>
+                  No input devices found
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Output Device</Label>
+          <Select value={selectedOutput} onValueChange={setSelectedOutput}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select output device" />
+            </SelectTrigger>
+            <SelectContent>
+              {outputDevices.map((device) => (
+                <SelectItem key={device} value={device}>
+                  {device}
+                </SelectItem>
+              ))}
+              {outputDevices.length === 0 && (
+                <SelectItem value="none" disabled>
+                  No output devices found
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Network Streaming</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="127.0.0.1"
+              value={networkHost}
+              onChange={(e) => setNetworkHost(e.target.value)}
+            />
+            <Input
+              type="number"
+              placeholder="6997"
+              value={networkPort}
+              onChange={(e) => setNetworkPort(Number(e.target.value))}
+              className="w-20"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">cpal backend</Badge>
+          <Badge variant="outline">ASIO (Windows)</Badge>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function App() {
   const {
     getRacks,
@@ -184,29 +285,47 @@ function App() {
 
       <main className="p-4">
         <div className="mb-4 flex gap-2">
-          <select className="rounded border bg-background px-2 py-1 text-sm">
-            <option>ASIO: AsioBridge Virtual Driver</option>
-          </select>
-          <select
-            className="rounded border bg-background px-2 py-1 text-sm"
-            value={config?.sample_rate ?? 44100}
-            onChange={(e) => handleSampleRateChange(Number(e.target.value))}
+          <Select>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Select ASIO driver" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asio">ASIO: AsioBridge Virtual Driver</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={config?.sample_rate?.toString() ?? '44100'}
+            onValueChange={(v: string) => handleSampleRateChange(Number(v))}
           >
-            {SAMPLE_RATES.map((rate) => (
-              <option key={rate} value={rate}>{rate} Hz</option>
-            ))}
-          </select>
-          <select className="rounded border bg-background px-2 py-1 text-sm">
-            {BIT_DEPTHS.map((bits) => (
-              <option key={bits} value={bits}>{bits} bit</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Sample rate" />
+            </SelectTrigger>
+            <SelectContent>
+              {SAMPLE_RATES.map((rate) => (
+                <SelectItem key={rate} value={rate.toString()}>{rate} Hz</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select>
+            <SelectTrigger className="w-24">
+              <SelectValue placeholder="Bit depth" />
+            </SelectTrigger>
+            <SelectContent>
+              {BIT_DEPTHS.map((bits) => (
+                <SelectItem key={bits} value={bits.toString()}>{bits} bit</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="mb-4 flex gap-4 overflow-x-auto pb-4">
           {racks.map((rack) => (
             <RackView key={rack.id} rack={rack} />
           ))}
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-4">
+          <DevicePanel />
         </div>
 
         <ConnectionMatrix connections={connections} />
