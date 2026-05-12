@@ -32,18 +32,67 @@ const RACK_COLORS: Record<string, string> = {
   'mix-out': 'border-cyan-500',
 }
 
-function ChannelStrip({ channel }: { channel: RackState['channels'][0] }) {
+const LEVEL_COLORS = [
+  'bg-green-500',
+  'bg-green-400',
+  'bg-lime-400',
+  'bg-yellow-400',
+  'bg-orange-400',
+  'bg-red-500',
+  'bg-red-600',
+]
+
+function LevelMeter({ level }: { level: number }) {
+  const segments = 12
+  const activeSegments = Math.floor(level * segments)
+
   return (
-    <div className="flex flex-col items-center gap-2">
-      <span className="text-xs text-muted-foreground">{channel.name}</span>
-      <div className="flex h-48 flex-col items-center gap-1">
-        <Slider
-          value={[channel.level]}
-          max={1}
-          step={0.01}
-          className="h-48 rotate-180"
-        />
-        <span className="text-xs text-muted-foreground">{Math.round(channel.level * 100)}%</span>
+    <div className="flex h-32 w-3 flex-col-reverse gap-0.5 rounded-sm overflow-hidden bg-muted">
+      {Array.from({ length: segments }).map((_, i) => {
+        const isActive = i < activeSegments
+        const colorIndex = Math.min(Math.floor((i / segments) * LEVEL_COLORS.length), LEVEL_COLORS.length - 1)
+        return (
+          <div
+            key={i}
+            className={cn(
+              'flex-1 rounded-sm transition-all duration-75',
+              isActive ? LEVEL_COLORS[colorIndex] : 'bg-muted-foreground/20'
+            )}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function ChannelStrip({ channel }: { channel: RackState['channels'][0] }) {
+  const [currentLevel, setCurrentLevel] = useState(0)
+
+  useEffect(() => {
+    if (!channel.active) {
+      setCurrentLevel(0)
+      return
+    }
+    const interval = setInterval(() => {
+      setCurrentLevel(Math.random() * 0.3 * channel.level)
+    }, 100)
+    return () => clearInterval(interval)
+  }, [channel.active, channel.level])
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] text-muted-foreground">{channel.name}</span>
+      <div className="flex items-center gap-1">
+        <LevelMeter level={currentLevel} />
+        <div className="flex flex-col items-center gap-1">
+          <Slider
+            value={[channel.level]}
+            max={1}
+            step={0.01}
+            className="h-48 rotate-180"
+          />
+          <span className="text-[10px] text-muted-foreground">{Math.round(channel.level * 100)}%</span>
+        </div>
       </div>
       <Switch checked={channel.active} />
     </div>
