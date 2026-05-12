@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useEngine } from '@/hooks/useEngine'
+import { useToast, ToastProvider } from '@/components/ui/toast'
 import type { RackState, ConnectionState, EngineConfig, EngineStatus } from '@/types/engine'
 
 const SAMPLE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
@@ -225,6 +226,7 @@ function DevicePanel() {
     stopRecording,
     getRecordingStatus,
   } = useEngine()
+  const { addToast } = useToast()
 
   const [inputDevices, setInputDevices] = useState<string[]>([])
   const [outputDevices, setOutputDevices] = useState<string[]>([])
@@ -274,8 +276,10 @@ function DevicePanel() {
         await startOutputDevice(selectedOutput)
       }
       setIsAudioRunning(true)
+      addToast('Audio started', 'success')
     } catch (e) {
       console.error('Failed to start audio:', e)
+      addToast('Failed to start audio', 'error')
     }
   }
 
@@ -283,8 +287,10 @@ function DevicePanel() {
     try {
       await stopAudioDevice()
       setIsAudioRunning(false)
+      addToast('Audio stopped', 'info')
     } catch (e) {
       console.error('Failed to stop audio:', e)
+      addToast('Failed to stop audio', 'error')
     }
   }
 
@@ -292,8 +298,10 @@ function DevicePanel() {
     try {
       await startNetworkStream(networkHost, networkPort)
       setIsNetworkStreaming(true)
+      addToast(`Network streaming to ${networkHost}:${networkPort}`, 'success')
     } catch (e) {
       console.error('Failed to start network stream:', e)
+      addToast('Failed to start network stream', 'error')
     }
   }
 
@@ -301,8 +309,10 @@ function DevicePanel() {
     try {
       await stopNetworkStream()
       setIsNetworkStreaming(false)
+      addToast('Network streaming stopped', 'info')
     } catch (e) {
       console.error('Failed to stop network stream:', e)
+      addToast('Failed to stop network stream', 'error')
     }
   }
 
@@ -310,8 +320,10 @@ function DevicePanel() {
     try {
       await startRecording('')
       setIsRecording(true)
+      addToast('Recording started', 'success')
     } catch (e) {
       console.error('Failed to start recording:', e)
+      addToast('Failed to start recording', 'error')
     }
   }
 
@@ -319,8 +331,10 @@ function DevicePanel() {
     try {
       await stopRecording()
       setIsRecording(false)
+      addToast('Recording stopped', 'info')
     } catch (e) {
       console.error('Failed to stop recording:', e)
+      addToast('Failed to stop recording', 'error')
     }
   }
 
@@ -514,6 +528,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background">
+      <ToastProvider>
       <header className="border-b bg-card px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">AsioBridge</h1>
@@ -608,6 +623,7 @@ function App() {
           </Button>
         </div>
       </footer>
+      </ToastProvider>
     </div>
   )
 }
