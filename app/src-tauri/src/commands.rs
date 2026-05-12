@@ -2,7 +2,7 @@ use asiobridge_core::{
     AudioEngine, Connection, ConnectionType,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,7 +38,7 @@ pub struct EngineConfig {
 }
 
 #[tauri::command]
-pub fn get_racks(engine: State<Mutex<AudioEngine>>) -> Result<Vec<RackState>, String> {
+pub fn get_racks(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<RackState>, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     let racks = engine.get_racks();
     let states: Vec<RackState> = racks
@@ -62,7 +62,7 @@ pub fn get_racks(engine: State<Mutex<AudioEngine>>) -> Result<Vec<RackState>, St
 }
 
 #[tauri::command]
-pub fn get_connections(engine: State<Mutex<AudioEngine>>) -> Result<Vec<ConnectionState>, String> {
+pub fn get_connections(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<ConnectionState>, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     let connections = engine.get_connections();
     let states: Vec<ConnectionState> = connections
@@ -80,21 +80,21 @@ pub fn get_connections(engine: State<Mutex<AudioEngine>>) -> Result<Vec<Connecti
 }
 
 #[tauri::command]
-pub fn start_engine(engine: State<Mutex<AudioEngine>>) -> Result<bool, String> {
+pub fn start_engine(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<bool, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     engine.start();
     Ok(engine.is_running())
 }
 
 #[tauri::command]
-pub fn stop_engine(engine: State<Mutex<AudioEngine>>) -> Result<bool, String> {
+pub fn stop_engine(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<bool, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     engine.stop();
     Ok(!engine.is_running())
 }
 
 #[tauri::command]
-pub fn get_engine_config(engine: State<Mutex<AudioEngine>>) -> Result<EngineConfig, String> {
+pub fn get_engine_config(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<EngineConfig, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     Ok(EngineConfig {
         sample_rate: engine.get_sample_rate(),
@@ -105,7 +105,7 @@ pub fn get_engine_config(engine: State<Mutex<AudioEngine>>) -> Result<EngineConf
 
 #[tauri::command]
 pub fn set_sample_rate(
-    engine: State<Mutex<AudioEngine>>,
+    engine: State<Arc<Mutex<AudioEngine>>>,
     sample_rate: u32,
 ) -> Result<u32, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
@@ -115,7 +115,7 @@ pub fn set_sample_rate(
 
 #[tauri::command]
 pub fn save_profile(
-    engine: State<Mutex<AudioEngine>>,
+    engine: State<Arc<Mutex<AudioEngine>>>,
     slot: usize,
     name: String,
 ) -> Result<bool, String> {
@@ -125,14 +125,14 @@ pub fn save_profile(
 }
 
 #[tauri::command]
-pub fn load_profile(engine: State<Mutex<AudioEngine>>, slot: usize) -> Result<bool, String> {
+pub fn load_profile(engine: State<Arc<Mutex<AudioEngine>>>, slot: usize) -> Result<bool, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     Ok(engine.load_profile(slot))
 }
 
 #[tauri::command]
 pub fn add_connection(
-    engine: State<Mutex<AudioEngine>>,
+    engine: State<Arc<Mutex<AudioEngine>>>,
     source_rack: String,
     source_channel: u32,
     dest_rack: String,
@@ -164,7 +164,7 @@ pub fn add_connection(
 
 #[tauri::command]
 pub fn remove_connection(
-    engine: State<Mutex<AudioEngine>>,
+    engine: State<Arc<Mutex<AudioEngine>>>,
     source_rack: String,
     source_channel: u32,
 ) -> Result<bool, String> {

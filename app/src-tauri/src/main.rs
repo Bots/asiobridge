@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod audio_manager;
 mod commands;
 
 use asiobridge_core::{AudioEngine, Channel, ChannelId, Rack, RackId};
-use std::sync::Mutex;
+use audio_manager::AudioManagerHandle;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 use tracing::info;
 
@@ -16,11 +18,15 @@ fn main() {
         .init();
 
     let engine = AudioEngine::new(44100, 24, 2);
+    let engine_arc = Arc::new(Mutex::new(engine));
+
+    let audio_manager = AudioManagerHandle::new(engine_arc.clone(), 2, 44100, 256);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .manage(Mutex::new(engine))
+        .manage(engine_arc)
+        .manage(audio_manager)
         .setup(|app| {
             let engine = app.state::<Mutex<AudioEngine>>();
             let mut engine = engine.lock().unwrap();
