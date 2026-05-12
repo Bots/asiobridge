@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/asiobridge-core",
+    "crates/asiobridge-driver-sys",
+    "crates/asiobridge-vst-sys",
+    "app/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["AsioBridge Contributors"]
+license = "MIT"
+repository = "https://github.com/asiobridge/asiobridge"
+
+[workspace.dependencies]
+cpal = "0.15"
+rubato = "0.14"
+ringbuf = "0.3"
+crossbeam-channel = "0.5"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+cc = "1"
+bindgen = "0.69"
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"

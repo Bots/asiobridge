@@ -1,0 +1,11 @@
+[package]
+name = "asiobridge-driver-sys"
+version.workspace = true
+edition.workspace = true
+build = "build.rs"
+
+[dependencies]
+bindgen = { version = "0.69", optional = true }
+
+[build-dependencies]
+cc = "1"

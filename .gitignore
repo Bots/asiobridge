@@ -1,0 +1,39 @@
+# Rust
+/target/
+**/Cargo.lock
+/target-winget/
+
+# Node
+/app/node_modules/
+/app/dist/
+
+# Tauri
+/app/src-tauri/target/
+/app/src-tauri/icons/
+
+# Windows build artifacts
+*.pdb
+*.ilk
+*.lib
+*.exe
+*.dll
+*.sys
+*.inf
+*.cat
+*.manifest
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.local
+*.p12
+*.pfx

@@ -1,0 +1,102 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: "20"
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev \
+            libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+            mingw-w64 g++-mingw-w64-x86-64
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu, x86_64-pc-windows-msvc
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: app
+        run: pnpm build
+
+      - name: Build Rust crates (Linux)
+        run: cargo build --release
+
+      - name: Build Rust crates (Windows target)
+        run: cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Build Tauri app (Linux)
+        working-directory: app/src-tauri
+        run: cargo build --release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            target/release/asiobridge-core
+            target/release/asiobridge-app
+            target/x86_64-pc-windows-gnu/release/
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build ASIO driver
+        run: |
+          cd driver/asiolink
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+
+      - name: Build kernel driver
+        run: |
+          cd driver/asiovadpro
+          msbuild AsioBridgeDriver.vcxproj /p:Configuration=Release /p:Platform=x64
+
+      - name: Sign driver (placeholder - needs EV certificate)
+        run: |
+          # SignTool sign /fd SHA256 /tr http://timestamp.sectigo.com /td SHA256 driver/asiovadpro/x64/Release/asiobridge.sys
+          echo "Signing requires EV certificate - configure in secrets"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            driver/asiovadpro/x64/Release/*.sys
+            driver/asiolink/x64/Release/*.dll

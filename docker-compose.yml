@@ -1,0 +1,20 @@
+# AsioBridge Linux Dev Environment
+# Note: Kernel driver development requires a real Windows VM with WDK.
+# This container is for Rust/Node development and cross-compilation.
+
+services:
+  dev:
+    image: rust:20-bookworm
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - cargo-cache:/home/rust/.cargo
+      - pnpm-cache:/home/rust/.local/share/pnpm
+    environment:
+      - CARGO_TERM_COLOR=always
+      - NODE_ENV=development
+    command: sleep infinity
+
+volumes:
+  cargo-cache:
+  pnpm-cache:
