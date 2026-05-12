@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useEngine } from '@/hooks/useEngine'
 import { useToast, ToastProvider } from '@/components/ui/toast'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import type { RackState, ConnectionState, EngineConfig, EngineStatus } from '@/types/engine'
 
 const SAMPLE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
@@ -525,6 +526,23 @@ function App() {
     const racksData = await getRacks()
     setRacks(racksData)
   }
+
+  useKeyboardShortcuts([
+    {
+      key: 's',
+      ctrl: true,
+      action: handleSaveProfile,
+    },
+    {
+      key: 'o',
+      ctrl: true,
+      action: handleLoadProfile,
+    },
+    {
+      key: ' ',
+      action: handleStartStop,
+    },
+  ])
 
   return (
     <div className="min-h-screen bg-background">
