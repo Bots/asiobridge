@@ -1,4 +1,6 @@
-/// Audio resampler using rubato for high-quality sample rate conversion
+/// Audio resampler — simple linear interpolation for now
+/// TODO: Full rubato integration once Steinberg ASIO SDK is available
+#[derive(Debug, Clone)]
 pub struct Resampler {
   from_rate: u32,
   to_rate: u32,
@@ -15,10 +17,26 @@ impl Resampler {
   }
 
   pub fn resample(&self, input: &[f32]) -> Vec<f32> {
-    let ratio = self.to_rate as f64 / self.from_rate as f64;
-    let len = (input.len() as f64 / ratio) as usize;
-    let mut output = vec![0.0f32; len];
-    // TODO: Implement actual rubato resampling
+    if self.from_rate == self.to_rate || input.is_empty() {
+      return input.to_vec();
+    }
+
+    let ratio = self.to_rate as f32 / self.from_rate as f32;
+    let output_len = (input.len() as f32 * ratio) as usize;
+    let mut output = vec![0.0f32; output_len];
+
+    for i in 0..output_len {
+      let src_pos = i as f32 / ratio;
+      let idx = src_pos as usize;
+      let frac = src_pos - idx as f32;
+
+      if idx + 1 < input.len() {
+        output[i] = input[idx] * (1.0 - frac) + input[idx + 1] * frac;
+      } else if idx < input.len() {
+        output[i] = input[idx];
+      }
+    }
+
     output
   }
 }
