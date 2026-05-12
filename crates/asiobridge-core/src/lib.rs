@@ -5,6 +5,7 @@ pub mod resampler;
 pub mod network;
 pub mod profile;
 pub mod engine;
+pub mod audio_stream;
 
 pub use rack::{Channel, Rack, RackId, ChannelId};
 pub use mixer::Mixer;
