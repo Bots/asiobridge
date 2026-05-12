@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { RackState, ConnectionState, EngineConfig } from '@/types/engine'
+import type { RackState, ConnectionState, EngineConfig, EngineStatus } from '@/types/engine'
 
 export function useEngine() {
   const getRacks = async (): Promise<RackState[]> => {
@@ -88,12 +88,17 @@ export function useEngine() {
     return invoke<string>('stop_audio_device')
   }
 
+  const getEngineStatus = async (): Promise<EngineStatus> => {
+    return invoke<EngineStatus>('get_engine_status')
+  }
+
   return {
     getRacks,
     getConnections,
     startEngine,
     stopEngine,
     getEngineConfig,
+    getEngineStatus,
     setSampleRate,
     saveProfile,
     loadProfile,

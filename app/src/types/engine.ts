@@ -25,3 +25,10 @@ export interface EngineConfig {
   bit_depth: number
   channels: number
 }
+
+export interface EngineStatus {
+  is_running: boolean
+  sample_rate: number
+  bit_depth: number
+  channels: number
+}

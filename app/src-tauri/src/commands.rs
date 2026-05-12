@@ -220,3 +220,24 @@ pub fn stop_audio_device(device: State<AudioManagerHandle>) -> Result<String, St
         .send_command(AudioCommand::Stop)
         .map(|_| "Audio stopped".to_string())
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EngineStatus {
+    pub is_running: bool,
+    pub sample_rate: u32,
+    pub bit_depth: u32,
+    pub channels: u16,
+}
+
+#[tauri::command]
+pub fn get_engine_status(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+) -> Result<EngineStatus, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    Ok(EngineStatus {
+        is_running: engine.is_running(),
+        sample_rate: engine.get_sample_rate(),
+        bit_depth: engine.get_bit_depth(),
+        channels: engine.get_channel_count(),
+    })
+}

@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useEngine } from '@/hooks/useEngine'
-import type { RackState, ConnectionState, EngineConfig } from '@/types/engine'
+import type { RackState, ConnectionState, EngineConfig, EngineStatus } from '@/types/engine'
 
 const SAMPLE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
 const BIT_DEPTHS = [16, 24, 32]
@@ -276,6 +276,7 @@ function App() {
     getRacks,
     getConnections,
     getEngineConfig,
+    getEngineStatus,
     startEngine,
     stopEngine,
     setSampleRate,
@@ -286,26 +287,32 @@ function App() {
   const [racks, setRacks] = useState<RackState[]>([])
   const [connections, setConnections] = useState<ConnectionState[]>([])
   const [config, setConfig] = useState<EngineConfig | null>(null)
-  const [isRunning, setIsRunning] = useState(false)
+  const [status, setStatus] = useState<EngineStatus | null>(null)
   const [selectedProfile, setSelectedProfile] = useState(0)
 
   useEffect(() => {
-    Promise.all([getRacks(), getConnections(), getEngineConfig()]).then(
-      ([racksData, connsData, configData]) => {
+    Promise.all([getRacks(), getConnections(), getEngineConfig(), getEngineStatus()]).then(
+      ([racksData, connsData, configData, statusData]) => {
         setRacks(racksData)
         setConnections(connsData)
         setConfig(configData)
+        setStatus(statusData)
       }
     )
+
+    const interval = setInterval(async () => {
+      const statusData = await getEngineStatus()
+      setStatus(statusData)
+    }, 1000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const handleStartStop = async () => {
-    if (isRunning) {
-      const stopped = await stopEngine()
-      setIsRunning(stopped)
+    if (status?.is_running) {
+      await stopEngine()
     } else {
-      const started = await startEngine()
-      setIsRunning(started)
+      await startEngine()
     }
   }
 
@@ -398,20 +405,20 @@ function App() {
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-4">
             <span className="text-muted-foreground">
-              Sample Rate: {config?.sample_rate ?? '---'} Hz
+              Sample Rate: {status?.sample_rate ?? config?.sample_rate ?? '---'} Hz
             </span>
             <span className="text-muted-foreground">
-              Bit Depth: {config?.bit_depth ?? '---'} bit
+              Bit Depth: {status?.bit_depth ?? config?.bit_depth ?? '---'} bit
             </span>
             <span className="text-muted-foreground">
-              Channels: {config?.channels ?? '---'}
+              Channels: {status?.channels ?? config?.channels ?? '---'}
             </span>
-            <span className={isRunning ? 'text-green-500' : 'text-red-500'}>
-              {isRunning ? '● Running' : '○ Stopped'}
+            <span className={status?.is_running ? 'text-green-500' : 'text-red-500'}>
+              {status?.is_running ? '● Running' : '○ Stopped'}
             </span>
           </div>
-          <Button size="sm" onClick={handleStartStop} variant={isRunning ? 'destructive' : 'default'}>
-            {isRunning ? 'Stop' : 'Start'}
+          <Button size="sm" onClick={handleStartStop} variant={status?.is_running ? 'destructive' : 'default'}>
+            {status?.is_running ? 'Stop' : 'Start'}
           </Button>
         </div>
       </footer>
