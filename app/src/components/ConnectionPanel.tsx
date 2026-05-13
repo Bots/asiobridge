@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { useEngine } from '@/hooks/useEngine'
 import type { ConnectionState } from '@/types/engine'
 
 const CONNECTION_TYPE_COLORS: Record<string, string> = {
@@ -23,15 +24,13 @@ const CONNECTION_TYPE_COLORS: Record<string, string> = {
   midi: 'bg-orange-500',
 }
 
-function ConnectionRow({ connection }: { connection: ConnectionState }) {
-  const [active, setActive] = useState(connection.is_active)
-
+function ConnectionRow({ connection, onToggle }: { connection: ConnectionState; onToggle: () => void }) {
   const typeColor = CONNECTION_TYPE_COLORS[connection.connection_type] || 'bg-gray-500'
 
   return (
     <div className={cn(
       'flex items-center justify-between p-3 rounded-lg border transition-colors',
-      active ? 'border-primary/50 bg-primary/5' : 'border-border'
+      connection.is_active ? 'border-primary/50 bg-primary/5' : 'border-border'
     )}>
       <div className="flex items-center gap-3">
         <div className={cn('w-3 h-3 rounded-full shrink-0', typeColor)} />
@@ -47,7 +46,7 @@ function ConnectionRow({ connection }: { connection: ConnectionState }) {
         <div className="text-[10px] text-muted-foreground">
           {connection.source_channel}→{connection.dest_channel}
         </div>
-        <Switch checked={active} onCheckedChange={setActive} />
+        <Switch checked={connection.is_active} onCheckedChange={onToggle} />
       </div>
     </div>
   )
@@ -56,6 +55,20 @@ function ConnectionRow({ connection }: { connection: ConnectionState }) {
 export function ConnectionPanel({ connections }: { connections: ConnectionState[] }) {
   const [filter, setFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const { toggleConnection } = useEngine()
+
+  const handleToggle = async (connection: ConnectionState) => {
+    try {
+      await toggleConnection(
+        connection.source_rack,
+        connection.source_channel,
+        connection.dest_rack,
+        connection.dest_channel
+      )
+    } catch (e) {
+      console.error('Failed to toggle connection:', e)
+    }
+  }
 
   const filtered = connections.filter((c) => {
     if (filter !== 'all' && c.connection_type !== filter) return false
@@ -93,7 +106,11 @@ export function ConnectionPanel({ connections }: { connections: ConnectionState[
         </div>
         <div className="flex flex-col gap-2">
           {filtered.map((connection) => (
-            <ConnectionRow key={`${connection.source_rack}-${connection.source_channel}-${connection.dest_rack}-${connection.dest_channel}`} connection={connection} />
+            <ConnectionRow
+              key={`${connection.source_rack}-${connection.source_channel}-${connection.dest_rack}-${connection.dest_channel}`}
+              connection={connection}
+              onToggle={() => handleToggle(connection)}
+            />
           ))}
           {filtered.length === 0 && (
             <div className="text-center py-8 text-sm text-muted-foreground">

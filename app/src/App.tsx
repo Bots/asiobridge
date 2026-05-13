@@ -70,24 +70,21 @@ function LevelMeter({ level }: { level: number }) {
 }
 
 function ChannelStrip({ channel }: { channel: RackState['channels'][0] }) {
-  const [currentLevel, setCurrentLevel] = useState(0)
+  const [displayLevel, setDisplayLevel] = useState(0)
 
   useEffect(() => {
     if (!channel.active) {
-      setCurrentLevel(0)
+      setDisplayLevel(0)
       return
     }
-    const interval = setInterval(() => {
-      setCurrentLevel(Math.random() * 0.3 * channel.level)
-    }, 100)
-    return () => clearInterval(interval)
-  }, [channel.active, channel.level])
+    setDisplayLevel(channel.level)
+  }, [channel.level, channel.active])
 
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-[10px] text-muted-foreground">{channel.name}</span>
       <div className="flex items-center gap-1">
-        <LevelMeter level={currentLevel} />
+        <LevelMeter level={displayLevel} />
         <div className="flex flex-col items-center gap-1">
           <Slider
             value={[channel.level]}
@@ -420,6 +417,7 @@ function App() {
     startEngine,
     stopEngine,
     setSampleRate,
+    setBitDepth,
     saveProfile,
     loadProfile,
   } = useEngine()
@@ -441,9 +439,10 @@ function App() {
     )
 
     const interval = setInterval(async () => {
-      const statusData = await getEngineStatus()
+      const [racksData, statusData] = await Promise.all([getRacks(), getEngineStatus()])
+      setRacks(racksData)
       setStatus(statusData)
-    }, 1000)
+    }, 100)
 
     return () => clearInterval(interval)
   }, [])
@@ -458,6 +457,12 @@ function App() {
 
   const handleSampleRateChange = async (rate: number) => {
     await setSampleRate(rate)
+    const configData = await getEngineConfig()
+    setConfig(configData)
+  }
+
+  const handleBitDepthChange = async (bits: number) => {
+    await setBitDepth(bits)
     const configData = await getEngineConfig()
     setConfig(configData)
   }
@@ -535,7 +540,10 @@ function App() {
               ))}
             </SelectContent>
           </Select>
-          <Select defaultValue="24">
+          <Select
+            value={config?.bit_depth?.toString() ?? '24'}
+            onValueChange={(v: string) => handleBitDepthChange(Number(v))}
+          >
             <SelectTrigger className="w-24">
               <SelectValue placeholder="Bit depth" />
             </SelectTrigger>

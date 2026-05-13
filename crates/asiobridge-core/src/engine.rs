@@ -22,6 +22,7 @@ pub struct AudioEngine {
     is_running: bool,
     audio_tx: Option<Sender<Vec<f32>>>,
     audio_rx: Option<Receiver<Vec<f32>>>,
+    channel_levels: HashMap<(String, u32), f32>,
 }
 
 impl AudioEngine {
@@ -40,6 +41,7 @@ impl AudioEngine {
             is_running: false,
             audio_tx: Some(audio_tx),
             audio_rx: Some(audio_rx),
+            channel_levels: HashMap::new(),
         }
     }
 
@@ -133,14 +135,25 @@ impl AudioEngine {
         self.is_running
     }
 
-    pub fn process_audio(&self, input: &[f32]) -> Vec<f32> {
+    pub fn process_audio(&mut self, input: &[f32]) -> Vec<f32> {
         if !self.is_running {
             return input.to_vec();
         }
 
         let active_connections: Vec<_> = self.connections.iter().filter(|c| c.is_active).collect();
 
+        for (_, level) in self.channel_levels.iter_mut() {
+            *level *= 0.95_f32;
+        }
+
         if active_connections.is_empty() {
+            for (i, &sample) in input.iter().enumerate() {
+                let abs_sample = sample.abs();
+                self.channel_levels
+                    .entry(("input".to_string(), i as u32))
+                    .and_modify(|v| *v = v.max(abs_sample))
+                    .or_insert(abs_sample);
+            }
             let mut output = input.to_vec();
             let max = output.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
             if max > 0.95 {
@@ -193,6 +206,11 @@ impl AudioEngine {
                 | ConnectionType::Vst
                 | ConnectionType::Midi => {
                     if source_ch < input.len() {
+                        let abs_sample = input[source_ch].abs();
+                        self.channel_levels
+                            .entry((connection.source_rack.clone(), connection.source_channel))
+                            .and_modify(|v| *v = v.max(abs_sample))
+                            .or_insert(abs_sample);
                         output[dest_ch] = output[dest_ch].max(0.0) + input[source_ch] * gain;
                     }
                 }
@@ -201,6 +219,11 @@ impl AudioEngine {
                 }
                 ConnectionType::MultiClient => {
                     for i in 0..std::cmp::min(input.len(), num_channels) {
+                        let abs_sample = input[i % input.len()].abs();
+                        self.channel_levels
+                            .entry((connection.source_rack.clone(), connection.source_channel))
+                            .and_modify(|v| *v = v.max(abs_sample))
+                            .or_insert(abs_sample);
                         output[i] += input[i % input.len()] * gain;
                     }
                 }
@@ -241,7 +264,20 @@ impl AudioEngine {
         self.bit_depth
     }
 
+    pub fn set_bit_depth(&mut self, bit_depth: u32) {
+        self.bit_depth = bit_depth;
+        info!("Bit depth changed to {}bit", bit_depth);
+    }
+
     pub fn get_channel_count(&self) -> u16 {
         self.channels
+    }
+
+    pub fn get_channel_levels(&self) -> &HashMap<(String, u32), f32> {
+        &self.channel_levels
+    }
+
+    pub fn clear_channel_levels(&mut self) {
+        self.channel_levels.clear();
     }
 }

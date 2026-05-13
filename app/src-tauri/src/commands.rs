@@ -40,21 +40,33 @@ pub struct EngineConfig {
 pub fn get_racks(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<RackState>, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     let racks = engine.get_racks();
+    let levels = engine.get_channel_levels();
     let states: Vec<RackState> = racks
         .values()
-        .map(|rack| RackState {
-            id: rack.id.to_string(),
-            name: rack.id.to_string(),
-            channels: rack
+        .map(|rack| {
+            let rack_id = rack.id.to_string();
+            let channels: Vec<ChannelState> = rack
                 .channels
                 .iter()
-                .map(|ch| ChannelState {
-                    id: ch.id.0,
-                    name: ch.name.clone(),
-                    active: ch.is_active,
-                    level: 0.8,
+                .enumerate()
+                .map(|(i, ch)| {
+                    let level = levels
+                        .get(&(rack_id.clone(), i as u32))
+                        .copied()
+                        .unwrap_or(0.0);
+                    ChannelState {
+                        id: ch.id.0,
+                        name: ch.name.clone(),
+                        active: ch.is_active,
+                        level,
+                    }
                 })
-                .collect(),
+                .collect();
+            RackState {
+                id: rack_id.clone(),
+                name: rack_id,
+                channels,
+            }
         })
         .collect();
     Ok(states)
@@ -172,6 +184,44 @@ pub fn remove_connection(
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     engine.remove_connection(&source_rack, source_channel);
     Ok(true)
+}
+
+#[tauri::command]
+pub fn toggle_connection(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+    source_rack: String,
+    source_channel: u32,
+    dest_rack: String,
+    dest_channel: u32,
+) -> Result<bool, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    let connection = engine
+        .get_connections()
+        .iter()
+        .find(|c| {
+            c.source_rack == source_rack
+                && c.source_channel == source_channel
+                && c.dest_rack == dest_rack
+                && c.dest_channel == dest_channel
+        })
+        .cloned();
+    if let Some(conn) = connection {
+        let mut updated = conn.clone();
+        updated.is_active = !updated.is_active;
+        engine.remove_connection(&source_rack, source_channel);
+        engine.add_connection(updated);
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn set_bit_depth(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+    bit_depth: u32,
+) -> Result<u32, String> {
+    let mut engine = engine.lock().map_err(|e| e.to_string())?;
+    engine.set_bit_depth(bit_depth);
+    Ok(engine.get_bit_depth())
 }
 
 #[tauri::command]

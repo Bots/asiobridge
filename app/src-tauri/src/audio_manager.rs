@@ -14,6 +14,7 @@ pub enum AudioCommand {
 }
 
 /// Audio manager runs on a dedicated thread and handles all cpal audio I/O
+#[allow(dead_code)]
 pub struct AudioManagerHandle {
     tx: std::sync::mpsc::Sender<AudioCommand>,
     input_rb: Arc<HeapRb<f32>>,
@@ -138,7 +139,7 @@ impl AudioManagerHandle {
                     }
                     drop(prod);
 
-                    let processed = if let Ok(engine_lock) = engine.lock() {
+                    let processed = if let Ok(mut engine_lock) = engine.lock() {
                         engine_lock.process_audio(data)
                     } else {
                         data.to_vec()
@@ -175,7 +176,7 @@ impl AudioManagerHandle {
                     drop(prod);
 
                     let f32_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
-                    let processed = if let Ok(engine_lock) = engine.lock() {
+                    let processed = if let Ok(mut engine_lock) = engine.lock() {
                         engine_lock.process_audio(&f32_data)
                     } else {
                         f32_data
@@ -364,24 +365,5 @@ impl AudioManagerHandle {
         host.default_output_device()
             .and_then(|d| d.name().ok())
             .map(|n| format!("Output: {}", n))
-    }
-
-    pub fn read_input(&self, buffer: &mut [f32]) -> usize {
-        let (_, mut cons) = self.input_rb.clone().split();
-        let mut count = 0;
-        for sample in buffer.iter_mut() {
-            *sample = cons.try_pop().unwrap_or(0.0);
-            count += 1;
-        }
-        drop(cons);
-        count
-    }
-
-    pub fn write_output(&self, samples: &[f32]) {
-        let (mut prod, _) = self.output_rb.clone().split();
-        for &sample in samples {
-            let _ = prod.try_push(sample);
-        }
-        drop(prod);
     }
 }

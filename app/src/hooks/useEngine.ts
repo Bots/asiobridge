@@ -60,6 +60,24 @@ export function useEngine() {
     })
   }
 
+  const toggleConnection = async (
+    sourceRack: string,
+    sourceChannel: number,
+    destRack: string,
+    destChannel: number
+  ): Promise<boolean> => {
+    return invoke<boolean>('toggle_connection', {
+      sourceRack,
+      sourceChannel,
+      destRack,
+      destChannel,
+    })
+  }
+
+  const setBitDepth = async (bitDepth: number): Promise<number> => {
+    return invoke<number>('set_bit_depth', { bitDepth })
+  }
+
   const getInputDevices = async (): Promise<string[]> => {
     return invoke<string[]>('get_input_devices')
   }
@@ -130,10 +148,12 @@ export function useEngine() {
     stopRecording,
     getRecordingStatus,
     setSampleRate,
+    setBitDepth,
     saveProfile,
     loadProfile,
     addConnection,
     removeConnection,
+    toggleConnection,
     getInputDevices,
     getOutputDevices,
     getDefaultInput,
