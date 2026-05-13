@@ -13,6 +13,17 @@ pub enum AudioCommand {
     Stop,
 }
 
+/// Parameters for starting audio input
+struct InputParams {
+    device_name: String,
+    channel_count: u16,
+    sample_rate: u32,
+    buffer_size: usize,
+    input_rb: Arc<HeapRb<f32>>,
+    engine: Arc<Mutex<AudioEngine>>,
+    output_rb: Arc<HeapRb<f32>>,
+}
+
 /// Audio manager runs on a dedicated thread and handles all cpal audio I/O
 #[allow(dead_code)]
 pub struct AudioManagerHandle {
@@ -44,16 +55,16 @@ impl AudioManagerHandle {
             while let Ok(cmd) = rx.recv() {
                 match cmd {
                     AudioCommand::StartInput(device_name) => {
-                        if let Err(e) = Self::start_input(
-                            &mut input_stream,
-                            &device_name,
+                        let params = InputParams {
+                            device_name,
                             channel_count,
                             sample_rate,
                             buffer_size,
-                            rb_input_rb.clone(),
-                            engine.clone(),
-                            rb_output_rb.clone(),
-                        ) {
+                            input_rb: rb_input_rb.clone(),
+                            engine: engine.clone(),
+                            output_rb: rb_output_rb.clone(),
+                        };
+                        if let Err(e) = Self::start_input(&mut input_stream, params) {
                             error!("Input error: {}", e);
                         }
                     }
@@ -91,16 +102,20 @@ impl AudioManagerHandle {
 
     fn start_input(
         stream: &mut Option<Stream>,
-        device_name: &str,
-        channel_count: u16,
-        sample_rate: u32,
-        buffer_size: usize,
-        input_rb: Arc<HeapRb<f32>>,
-        engine: Arc<Mutex<AudioEngine>>,
-        output_rb: Arc<HeapRb<f32>>,
+        params: InputParams,
     ) -> Result<(), String> {
+        let InputParams {
+            device_name,
+            channel_count,
+            sample_rate,
+            buffer_size,
+            input_rb,
+            engine,
+            output_rb,
+        } = params;
+
         let host = cpal::default_host();
-        let device = Self::find_device(&host, device_name)
+        let device = Self::find_device(&host, &device_name)
             .ok_or_else(|| format!("Device not found: {}", device_name))?;
 
         let input_config = device
