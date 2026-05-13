@@ -54,11 +54,7 @@ impl NetworkStream {
         }
     }
 
-    pub fn start(
-        &self,
-        sample_rate: u32,
-        channels: u16,
-    ) -> Option<ActiveNetworkStream> {
+    pub fn start(&self, sample_rate: u32, channels: u16) -> Option<ActiveNetworkStream> {
         let addr = format!("{}:{}", self.host, self.port);
         let shared_audio = Arc::new(Mutex::new(Vec::new()));
         let audio_for_recv = shared_audio.clone();

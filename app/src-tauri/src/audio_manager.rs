@@ -100,10 +100,7 @@ impl AudioManagerHandle {
         }
     }
 
-    fn start_input(
-        stream: &mut Option<Stream>,
-        params: InputParams,
-    ) -> Result<(), String> {
+    fn start_input(stream: &mut Option<Stream>, params: InputParams) -> Result<(), String> {
         let InputParams {
             device_name,
             channel_count,

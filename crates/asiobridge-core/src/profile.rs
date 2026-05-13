@@ -58,9 +58,17 @@ impl ProfileManager {
         }
 
         let path = self.slot_path(slot);
-        match fs::write(&path, serde_json::to_string_pretty(&profile).unwrap_or_default()) {
+        match fs::write(
+            &path,
+            serde_json::to_string_pretty(&profile).unwrap_or_default(),
+        ) {
             Ok(_) => {
-                info!("Saved profile '{}' to slot {} ({})", profile.name, slot, path.display());
+                info!(
+                    "Saved profile '{}' to slot {} ({})",
+                    profile.name,
+                    slot,
+                    path.display()
+                );
                 true
             }
             Err(e) => {
@@ -79,7 +87,12 @@ impl ProfileManager {
         match fs::read_to_string(&path) {
             Ok(content) => match serde_json::from_str::<Profile>(&content) {
                 Ok(profile) => {
-                    info!("Loaded profile '{}' from slot {} ({})", profile.name, slot, path.display());
+                    info!(
+                        "Loaded profile '{}' from slot {} ({})",
+                        profile.name,
+                        slot,
+                        path.display()
+                    );
                     Some(profile)
                 }
                 Err(e) => {

@@ -248,7 +248,9 @@ pub fn get_default_output(device: State<AudioManagerHandle>) -> Result<Option<St
 }
 
 #[tauri::command]
-pub fn get_available_drivers(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<String>, String> {
+pub fn get_available_drivers(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+) -> Result<Vec<String>, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     let racks = engine.get_racks();
     let drivers: Vec<String> = racks

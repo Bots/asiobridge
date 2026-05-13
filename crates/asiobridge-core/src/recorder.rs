@@ -63,9 +63,7 @@ impl AudioRecorder {
 
         let num_frames = self.samples_written / (self.channels as u32);
         let bytes_per_sample = (self.bit_depth as u32) / 8;
-        let data_size = (num_frames as u64)
-            * (self.channels as u64)
-            * (bytes_per_sample as u64);
+        let data_size = (num_frames as u64) * (self.channels as u64) * (bytes_per_sample as u64);
         let file_size = 36 + data_size;
 
         if let Some(mut writer) = self.writer.take() {

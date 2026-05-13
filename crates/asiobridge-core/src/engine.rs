@@ -19,7 +19,10 @@ pub struct ChannelLevel {
 
 impl Default for ChannelLevel {
     fn default() -> Self {
-        Self { rms: 0.0, peak: 0.0 }
+        Self {
+            rms: 0.0,
+            peak: 0.0,
+        }
     }
 }
 
@@ -118,9 +121,16 @@ impl AudioEngine {
         }
 
         // Save settings
-        profile.global_settings.insert("sample_rate".to_string(), serde_json::json!(self.sample_rate));
-        profile.global_settings.insert("bit_depth".to_string(), serde_json::json!(self.bit_depth));
-        profile.global_settings.insert("channels".to_string(), serde_json::json!(self.channels));
+        profile.global_settings.insert(
+            "sample_rate".to_string(),
+            serde_json::json!(self.sample_rate),
+        );
+        profile
+            .global_settings
+            .insert("bit_depth".to_string(), serde_json::json!(self.bit_depth));
+        profile
+            .global_settings
+            .insert("channels".to_string(), serde_json::json!(self.channels));
 
         self.profile_manager.save(slot, profile)
     }
@@ -518,7 +528,10 @@ mod tests {
 
         let levels = engine.get_channel_levels();
         let ch0_level = levels.get(&("ASIO Driver IN".to_string(), 0));
-        assert!(ch0_level.is_some(), "Level should be tracked for source channel");
+        assert!(
+            ch0_level.is_some(),
+            "Level should be tracked for source channel"
+        );
         assert!(ch0_level.unwrap().peak > 0.5, "Peak should be > 0.5");
     }
 
