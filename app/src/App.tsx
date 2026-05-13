@@ -77,8 +77,8 @@ function ChannelStrip({ channel }: { channel: RackState['channels'][0] }) {
       setDisplayLevel(0)
       return
     }
-    setDisplayLevel(channel.level)
-  }, [channel.level, channel.active])
+    setDisplayLevel(channel.peak)
+  }, [channel.peak, channel.active])
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -420,6 +420,7 @@ function App() {
     setBitDepth,
     saveProfile,
     loadProfile,
+    getAvailableDrivers,
   } = useEngine()
 
   const [racks, setRacks] = useState<RackState[]>([])
@@ -427,6 +428,8 @@ function App() {
   const [config, setConfig] = useState<EngineConfig | null>(null)
   const [status, setStatus] = useState<EngineStatus | null>(null)
   const [selectedProfile, setSelectedProfile] = useState(0)
+  const [availableDrivers, setAvailableDrivers] = useState<string[]>([])
+  const [selectedDriver, setSelectedDriver] = useState('')
 
   useEffect(() => {
     Promise.all([getRacks(), getConnections(), getEngineConfig(), getEngineStatus()]).then(
@@ -437,6 +440,13 @@ function App() {
         setStatus(statusData)
       }
     )
+
+    getAvailableDrivers().then((drivers) => {
+      setAvailableDrivers(drivers)
+      if (drivers.length > 0) {
+        setSelectedDriver(drivers[0])
+      }
+    })
 
     const interval = setInterval(async () => {
       const [racksData, statusData] = await Promise.all([getRacks(), getEngineStatus()])
@@ -519,12 +529,19 @@ function App() {
 
       <main className="p-4">
         <div className="mb-4 flex gap-2">
-          <Select defaultValue="asio">
+          <Select value={selectedDriver} onValueChange={setSelectedDriver}>
             <SelectTrigger className="w-64">
-              <SelectValue placeholder="Select ASIO driver" />
+              <SelectValue placeholder="Select driver" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="asio">ASIO: AsioBridge Virtual Driver</SelectItem>
+              {availableDrivers.map((driver) => (
+                <SelectItem key={driver} value={driver}>{driver}</SelectItem>
+              ))}
+              {availableDrivers.length === 0 && (
+                <SelectItem value="none" disabled>
+                  No drivers available
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
           <Select

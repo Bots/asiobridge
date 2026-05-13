@@ -1,6 +1,7 @@
 use crate::audio_manager::{AudioCommand, AudioManagerHandle};
-use asiobridge_core::{AudioEngine, Connection, ConnectionType};
+use asiobridge_core::{AudioEngine, Connection, ConnectionType, RackId};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
@@ -10,6 +11,7 @@ pub struct ChannelState {
     pub name: String,
     pub active: bool,
     pub level: f32,
+    pub peak: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -50,15 +52,16 @@ pub fn get_racks(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<RackState
                 .iter()
                 .enumerate()
                 .map(|(i, ch)| {
-                    let level = levels
+                    let cl = levels
                         .get(&(rack_id.clone(), i as u32))
                         .copied()
-                        .unwrap_or(0.0);
+                        .unwrap_or(asiobridge_core::ChannelLevel::new());
                     ChannelState {
                         id: ch.id.0,
                         name: ch.name.clone(),
                         active: ch.is_active,
-                        level,
+                        level: cl.rms,
+                        peak: cl.peak,
                     }
                 })
                 .collect();
@@ -245,6 +248,22 @@ pub fn get_default_output(device: State<AudioManagerHandle>) -> Result<Option<St
 }
 
 #[tauri::command]
+pub fn get_available_drivers(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<String>, String> {
+    let engine = engine.lock().map_err(|e| e.to_string())?;
+    let racks = engine.get_racks();
+    let drivers: Vec<String> = racks
+        .values()
+        .filter(|r| {
+            r.id == RackId::AsioDriverIn
+                || r.id == RackId::AsioDriverOutMix
+                || r.id == RackId::AsioHostInMix
+        })
+        .map(|r| r.id.to_string())
+        .collect();
+    Ok(drivers)
+}
+
+#[tauri::command]
 pub fn start_input_device(
     device: State<AudioManagerHandle>,
     device_name: String,
@@ -345,15 +364,15 @@ pub fn start_recording(
     output_dir: String,
 ) -> Result<bool, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
-    // Recording would be handled by the recorder module
-    Ok(true)
+    let dir = PathBuf::from(output_dir);
+    std::fs::create_dir_all(&dir).ok();
+    Ok(engine.start_recording())
 }
 
 #[tauri::command]
 pub fn stop_recording(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<bool, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
-    // Recording would be handled by the recorder module
-    Ok(true)
+    Ok(engine.stop_recording())
 }
 
 #[tauri::command]
@@ -362,7 +381,10 @@ pub fn get_recording_status(
 ) -> Result<RecordingStatus, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     Ok(RecordingStatus {
-        is_recording: false,
-        output_dir: " recordings".to_string(),
+        is_recording: engine.is_recording(),
+        output_dir: engine
+            .get_recording_output_dir()
+            .to_string_lossy()
+            .to_string(),
     })
 }

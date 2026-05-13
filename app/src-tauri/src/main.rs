@@ -189,6 +189,7 @@ fn main() {
             commands::get_output_devices,
             commands::get_default_input,
             commands::get_default_output,
+            commands::get_available_drivers,
             commands::start_input_device,
             commands::start_output_device,
             commands::stop_audio_device,

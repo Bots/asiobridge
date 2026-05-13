@@ -1,12 +1,27 @@
 use crate::connection::{Connection, ConnectionType};
 use crate::mixer::Mixer;
-use crate::network::NetworkStream;
+use crate::network::{ActiveNetworkStream, NetworkStream};
 use crate::profile::{Profile, ProfileManager};
 use crate::rack::Rack;
+use crate::recorder::AudioRecorder;
 use crate::resampler::Resampler;
 use crossbeam_channel::{Receiver, Sender};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tracing::{info, warn};
+
+/// Channel level data with RMS and peak measurements
+#[derive(Debug, Clone, Copy)]
+pub struct ChannelLevel {
+    pub rms: f32,
+    pub peak: f32,
+}
+
+impl ChannelLevel {
+    pub fn new() -> Self {
+        Self { rms: 0.0, peak: 0.0 }
+    }
+}
 
 /// Audio routing engine — manages racks, connections, and the audio pipeline
 pub struct AudioEngine {
@@ -16,18 +31,21 @@ pub struct AudioEngine {
     resampler: Resampler,
     profile_manager: ProfileManager,
     network_streams: Vec<NetworkStream>,
+    active_network_streams: Vec<ActiveNetworkStream>,
     sample_rate: u32,
     bit_depth: u32,
     channels: u16,
     is_running: bool,
     audio_tx: Option<Sender<Vec<f32>>>,
     audio_rx: Option<Receiver<Vec<f32>>>,
-    channel_levels: HashMap<(String, u32), f32>,
+    channel_levels: HashMap<(String, u32), ChannelLevel>,
+    recorder: AudioRecorder,
 }
 
 impl AudioEngine {
     pub fn new(sample_rate: u32, bit_depth: u32, channels: u16) -> Self {
         let (audio_tx, audio_rx) = crossbeam_channel::unbounded();
+        let recorder_dir = PathBuf::from("recordings");
         Self {
             racks: HashMap::new(),
             connections: Vec::new(),
@@ -35,6 +53,7 @@ impl AudioEngine {
             resampler: Resampler::new(sample_rate, sample_rate, channels as usize),
             profile_manager: ProfileManager::new(),
             network_streams: Vec::new(),
+            active_network_streams: Vec::new(),
             sample_rate,
             bit_depth,
             channels,
@@ -42,6 +61,7 @@ impl AudioEngine {
             audio_tx: Some(audio_tx),
             audio_rx: Some(audio_rx),
             channel_levels: HashMap::new(),
+            recorder: AudioRecorder::new(recorder_dir, sample_rate, bit_depth as u16, channels),
         }
     }
 
@@ -79,19 +99,59 @@ impl AudioEngine {
         &self.racks
     }
 
-    pub fn save_profile(&mut self, slot: usize, name: &str) {
-        let profile = Profile::new(name.to_string());
-        self.profile_manager.save(slot, profile);
-        info!("Saved profile to slot {}", slot);
+    pub fn save_profile(&mut self, slot: usize, name: &str) -> bool {
+        let mut profile = Profile::new(name.to_string());
+
+        // Save racks
+        for (id, rack) in self.racks.iter() {
+            let rack_data = serde_json::json!({
+                "id": id,
+                "channels": rack.channels
+            });
+            profile.racks.insert(id.clone(), rack_data);
+        }
+
+        // Save connections
+        for conn in &self.connections {
+            let conn_data = serde_json::json!(conn);
+            profile.connections.push(conn_data);
+        }
+
+        // Save settings
+        profile.global_settings.insert("sample_rate".to_string(), serde_json::json!(self.sample_rate));
+        profile.global_settings.insert("bit_depth".to_string(), serde_json::json!(self.bit_depth));
+        profile.global_settings.insert("channels".to_string(), serde_json::json!(self.channels));
+
+        self.profile_manager.save(slot, profile)
     }
 
     pub fn load_profile(&mut self, slot: usize) -> bool {
-        if self.profile_manager.load(slot).is_some() {
-            info!("Loaded profile from slot {}", slot);
-            true
-        } else {
-            warn!("No profile in slot {}", slot);
-            false
+        match self.profile_manager.load(slot) {
+            Some(profile) => {
+                // Restore settings
+                if let Some(sr) = profile.global_settings.get("sample_rate") {
+                    if let Some(rate) = sr.as_u64() {
+                        self.sample_rate = rate as u32;
+                    }
+                }
+                if let Some(bd) = profile.global_settings.get("bit_depth") {
+                    if let Some(depth) = bd.as_u64() {
+                        self.bit_depth = depth as u32;
+                    }
+                }
+                if let Some(ch) = profile.global_settings.get("channels") {
+                    if let Some(count) = ch.as_u64() {
+                        self.channels = count as u16;
+                    }
+                }
+
+                info!("Loaded profile '{}' from slot {}", profile.name, slot);
+                true
+            }
+            None => {
+                warn!("No profile in slot {}", slot);
+                false
+            }
         }
     }
 
@@ -100,7 +160,18 @@ impl AudioEngine {
             "Adding network stream: {}:{} ch{} {}Hz {}bit",
             stream.host, stream.port, stream.channels, stream.sample_rate, stream.bit_depth
         );
-        self.network_streams.push(stream);
+
+        // Stop any existing active streams first
+        for active in self.active_network_streams.iter_mut() {
+            active.stop();
+        }
+        self.active_network_streams.clear();
+        self.network_streams.clear();
+
+        if let Some(active) = stream.start(self.sample_rate, self.channels) {
+            self.network_streams.push(stream);
+            self.active_network_streams.push(active);
+        }
     }
 
     pub fn get_network_streams(&self) -> &[NetworkStream] {
@@ -108,7 +179,21 @@ impl AudioEngine {
     }
 
     pub fn clear_network_streams(&mut self) {
+        for active in self.active_network_streams.iter_mut() {
+            active.stop();
+        }
+        self.active_network_streams.clear();
         self.network_streams.clear();
+    }
+
+    pub fn get_network_audio(&self) -> Vec<f32> {
+        for active in &self.active_network_streams {
+            let audio = active.get_audio();
+            if !audio.is_empty() {
+                return audio;
+            }
+        }
+        Vec::new()
     }
 
     pub fn start(&mut self) {
@@ -140,19 +225,35 @@ impl AudioEngine {
             return input.to_vec();
         }
 
+        // Get incoming network audio and inject it into the network-in rack
+        let network_audio = self.get_network_audio();
+        if !network_audio.is_empty() {
+            if let Some(rack) = self.racks.get_mut("network-in") {
+                let channels_to_fill = std::cmp::min(network_audio.len(), rack.channels.len());
+                for i in 0..channels_to_fill {
+                    rack.channels[i].level = network_audio[i];
+                }
+            }
+        }
+
         let active_connections: Vec<_> = self.connections.iter().filter(|c| c.is_active).collect();
 
-        for (_, level) in self.channel_levels.iter_mut() {
-            *level *= 0.95_f32;
+        // Decay levels slowly (hold ~500ms then decay)
+        for level in self.channel_levels.values_mut() {
+            level.rms *= 0.99_f32;
+            level.peak *= 0.995_f32;
         }
 
         if active_connections.is_empty() {
             for (i, &sample) in input.iter().enumerate() {
-                let abs_sample = sample.abs();
-                self.channel_levels
+                let abs = sample.abs();
+                let entry = self
+                    .channel_levels
                     .entry(("input".to_string(), i as u32))
-                    .and_modify(|v| *v = v.max(abs_sample))
-                    .or_insert(abs_sample);
+                    .or_insert_with(ChannelLevel::new);
+                entry.peak = entry.peak.max(abs);
+                entry.rms = (entry.rms * entry.rms + abs * abs) * 0.5_f32;
+                entry.rms = entry.rms.sqrt();
             }
             let mut output = input.to_vec();
             let max = output.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
@@ -206,11 +307,14 @@ impl AudioEngine {
                 | ConnectionType::Vst
                 | ConnectionType::Midi => {
                     if source_ch < input.len() {
-                        let abs_sample = input[source_ch].abs();
-                        self.channel_levels
+                        let abs = input[source_ch].abs();
+                        let entry = self
+                            .channel_levels
                             .entry((connection.source_rack.clone(), connection.source_channel))
-                            .and_modify(|v| *v = v.max(abs_sample))
-                            .or_insert(abs_sample);
+                            .or_insert_with(ChannelLevel::new);
+                        entry.peak = entry.peak.max(abs);
+                        entry.rms = (entry.rms * entry.rms + abs * abs) * 0.5_f32;
+                        entry.rms = entry.rms.sqrt();
                         output[dest_ch] = output[dest_ch].max(0.0) + input[source_ch] * gain;
                     }
                 }
@@ -219,11 +323,14 @@ impl AudioEngine {
                 }
                 ConnectionType::MultiClient => {
                     for i in 0..std::cmp::min(input.len(), num_channels) {
-                        let abs_sample = input[i % input.len()].abs();
-                        self.channel_levels
+                        let abs = input[i % input.len()].abs();
+                        let entry = self
+                            .channel_levels
                             .entry((connection.source_rack.clone(), connection.source_channel))
-                            .and_modify(|v| *v = v.max(abs_sample))
-                            .or_insert(abs_sample);
+                            .or_insert_with(ChannelLevel::new);
+                        entry.peak = entry.peak.max(abs);
+                        entry.rms = (entry.rms * entry.rms + abs * abs) * 0.5_f32;
+                        entry.rms = entry.rms.sqrt();
                         output[i] += input[i % input.len()] * gain;
                     }
                 }
@@ -236,6 +343,11 @@ impl AudioEngine {
             for sample in output.iter_mut() {
                 *sample *= gain;
             }
+        }
+
+        // Write to recorder if active
+        if self.recorder.is_recording() {
+            self.recorder.write_samples(&output);
         }
 
         output
@@ -273,11 +385,27 @@ impl AudioEngine {
         self.channels
     }
 
-    pub fn get_channel_levels(&self) -> &HashMap<(String, u32), f32> {
+    pub fn get_channel_levels(&self) -> &HashMap<(String, u32), ChannelLevel> {
         &self.channel_levels
     }
 
     pub fn clear_channel_levels(&mut self) {
         self.channel_levels.clear();
+    }
+
+    pub fn start_recording(&mut self) -> bool {
+        self.recorder.start_recording()
+    }
+
+    pub fn stop_recording(&mut self) -> bool {
+        self.recorder.stop_recording()
+    }
+
+    pub fn is_recording(&self) -> bool {
+        self.recorder.is_recording()
+    }
+
+    pub fn get_recording_output_dir(&self) -> PathBuf {
+        self.recorder.get_output_dir()
     }
 }

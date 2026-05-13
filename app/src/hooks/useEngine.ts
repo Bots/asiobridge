@@ -134,6 +134,10 @@ export function useEngine() {
     return invoke<{ is_recording: boolean; output_dir: string }>('get_recording_status')
   }
 
+  const getAvailableDrivers = async (): Promise<string[]> => {
+    return invoke<string[]>('get_available_drivers')
+  }
+
   return {
     getRacks,
     getConnections,
@@ -154,6 +158,7 @@ export function useEngine() {
     addConnection,
     removeConnection,
     toggleConnection,
+    getAvailableDrivers,
     getInputDevices,
     getOutputDevices,
     getDefaultInput,

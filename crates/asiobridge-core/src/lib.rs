@@ -10,7 +10,7 @@ pub mod resampler;
 
 pub use audio_stream::AudioStream;
 pub use connection::{Connection, ConnectionType};
-pub use engine::AudioEngine;
+pub use engine::{AudioEngine, ChannelLevel};
 pub use mixer::Mixer;
 pub use network::NetworkStream;
 pub use profile::{Profile, ProfileManager};

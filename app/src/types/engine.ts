@@ -3,6 +3,7 @@ export interface ChannelState {
   name: string
   active: boolean
   level: number
+  peak: number
 }
 
 export interface RackState {

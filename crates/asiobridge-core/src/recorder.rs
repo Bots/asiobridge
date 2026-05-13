@@ -1,21 +1,68 @@
 use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use tracing::{error, info};
 
-/// Audio recorder that writes to FLAC files
+/// WAV file header structure
+struct WavHeader {
+    sample_rate: u32,
+    channels: u16,
+    bit_depth: u16,
+    num_frames: u32,
+}
+
+impl WavHeader {
+    fn new(sample_rate: u32, channels: u16, bit_depth: u16, num_frames: u32) -> Self {
+        Self {
+            sample_rate,
+            channels,
+            bit_depth,
+            num_frames,
+        }
+    }
+
+    fn write_to<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let bytes_per_sample = (self.bit_depth as u32) / 8;
+        let data_size = (self.num_frames as u64)
+            * (self.channels as u64)
+            * (bytes_per_sample as u64);
+        let file_size = 36 + data_size;
+
+        writer.write_all(b"RIFF")?;
+        writer.write_all(&(file_size as u32).to_le_bytes())?;
+        writer.write_all(b"WAVE")?;
+
+        writer.write_all(b"fmt ")?;
+        writer.write_all(&16u32.to_le_bytes())?;
+        writer.write_all(&1u16.to_le_bytes())?;
+        writer.write_all(&self.channels.to_le_bytes())?;
+        writer.write_all(&self.sample_rate.to_le_bytes())?;
+        writer.write_all(
+            &(self.sample_rate * bytes_per_sample * self.channels as u32).to_le_bytes(),
+        )?;
+        writer.write_all(&((bytes_per_sample as u16) * self.channels).to_le_bytes())?;
+        writer.write_all(&self.bit_depth.to_le_bytes())?;
+
+        writer.write_all(b"data")?;
+        writer.write_all(&(data_size as u32).to_le_bytes())?;
+
+        Ok(())
+    }
+}
+
+/// Audio recorder that writes to WAV files
 pub struct AudioRecorder {
     output_dir: PathBuf,
     is_recording: bool,
     sample_rate: u32,
-    bit_depth: u32,
+    bit_depth: u16,
     channels: u16,
-    buffer: Arc<Mutex<Vec<f32>>>,
-    file_handle: Option<File>,
+    writer: Option<BufWriter<File>>,
+    samples_written: u32,
 }
 
 impl AudioRecorder {
-    pub fn new(output_dir: PathBuf, sample_rate: u32, bit_depth: u32, channels: u16) -> Self {
+    pub fn new(output_dir: PathBuf, sample_rate: u32, bit_depth: u16, channels: u16) -> Self {
         std::fs::create_dir_all(&output_dir).ok();
         Self {
             output_dir,
@@ -23,8 +70,8 @@ impl AudioRecorder {
             sample_rate,
             bit_depth,
             channels,
-            buffer: Arc::new(Mutex::new(Vec::new())),
-            file_handle: None,
+            writer: None,
+            samples_written: 0,
         }
     }
 
@@ -35,16 +82,18 @@ impl AudioRecorder {
 
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let filename = format!(
-            "recording_{}ch_{}hz_{}.flac",
+            "recording_{}ch_{}hz_{}.wav",
             self.channels, self.sample_rate, timestamp
         );
         let filepath = self.output_dir.join(filename);
 
         match File::create(&filepath) {
             Ok(file) => {
+                let writer = BufWriter::new(file);
                 info!("Starting recording to {}", filepath.display());
-                self.file_handle = Some(file);
+                self.writer = Some(writer);
                 self.is_recording = true;
+                self.samples_written = 0;
                 true
             }
             Err(e) => {
@@ -59,9 +108,16 @@ impl AudioRecorder {
             return false;
         }
 
-        info!("Stopping recording");
+        info!(
+            "Stopping recording: {} frames, {} ch, {}Hz, {}bit",
+            self.samples_written,
+            self.channels,
+            self.sample_rate,
+            self.bit_depth
+        );
+
+        self.writer.take();
         self.is_recording = false;
-        self.file_handle = None;
         true
     }
 
@@ -70,16 +126,38 @@ impl AudioRecorder {
     }
 
     pub fn write_samples(&mut self, samples: &[f32]) {
-        if !self.is_recording {
+        if !self.is_recording || self.writer.is_none() {
             return;
         }
 
-        if let Ok(mut buffer) = self.buffer.lock() {
-            buffer.extend_from_slice(samples);
+        let i16_samples: Vec<i16> = samples
+            .iter()
+            .map(|&s| {
+                let clamped = s.clamp(-1.0, 1.0);
+                (clamped * 32767.0) as i16
+            })
+            .collect();
+
+        if let Some(ref mut writer) = self.writer {
+            if let Err(e) = writer.write_all(bytemuck::cast_slice(&i16_samples)) {
+                error!("Failed to write audio samples: {}", e);
+                self.is_recording = false;
+                self.writer = None;
+                return;
+            }
+            self.samples_written += i16_samples.len() as u32;
         }
     }
 
     pub fn get_output_dir(&self) -> PathBuf {
         self.output_dir.clone()
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: u32) {
+        self.sample_rate = sample_rate;
+    }
+
+    pub fn set_channels(&mut self, channels: u16) {
+        self.channels = channels;
     }
 }
