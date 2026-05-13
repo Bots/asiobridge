@@ -1,19 +1,19 @@
-pub mod rack;
-pub mod mixer;
+pub mod audio_stream;
 pub mod connection;
-pub mod resampler;
+pub mod engine;
+pub mod mixer;
 pub mod network;
 pub mod profile;
-pub mod engine;
-pub mod audio_stream;
+pub mod rack;
 pub mod recorder;
+pub mod resampler;
 
 pub use audio_stream::AudioStream;
-pub use rack::{Channel, Rack, RackId, ChannelId};
-pub use mixer::Mixer;
 pub use connection::{Connection, ConnectionType};
-pub use resampler::Resampler;
+pub use engine::AudioEngine;
+pub use mixer::Mixer;
 pub use network::NetworkStream;
 pub use profile::{Profile, ProfileManager};
-pub use engine::AudioEngine;
+pub use rack::{Channel, ChannelId, Rack, RackId};
 pub use recorder::AudioRecorder;
+pub use resampler::Resampler;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Slider } from '@/components/ui/slider'
@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils'
 import { useEngine } from '@/hooks/useEngine'
 import { useToast, ToastProvider } from '@/components/ui/toast'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { ConnectionPanel } from '@/components/ConnectionPanel'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { RackState, ConnectionState, EngineConfig, EngineStatus } from '@/types/engine'
 
 const SAMPLE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
@@ -153,63 +155,6 @@ function MixerView({ channels }: { channels: RackState['channels'] }) {
   )
 }
 
-function ConnectionMatrix({ connections }: { connections: ConnectionState[] }) {
-  const rackIds = [
-    'asio-driver-in',
-    'asio-driver-out',
-    'asio-host-in',
-    'network-in',
-    'network-out',
-    'mix-out',
-  ]
-  const rackNames = rackIds.map((id) => id.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' '))
-
-  const activeConnections = connections.filter(c => c.is_active).length
-
-  return (
-    <Card>
-      <CardHeader className="p-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">Connection Matrix</CardTitle>
-          <Badge variant="outline">{activeConnections} active</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="p-3">
-        <div className="grid gap-1" style={{ gridTemplateColumns: `auto repeat(${rackIds.length}, auto)` }}>
-          <div></div>
-          {rackNames.map((name, i) => (
-            <div key={i} className="text-center text-xs text-muted-foreground">{name}</div>
-          ))}
-          {rackIds.map((srcId, srcIdx) => (
-            <React.Fragment key={srcId}>
-              <div className="text-center text-xs text-muted-foreground">{rackNames[srcIdx]}</div>
-              {rackIds.map((dstId) => {
-                const conn = connections.find(
-                  (c) => c.source_rack === srcId && c.dest_rack === dstId
-                )
-                const isActive = conn?.is_active ?? false
-                return (
-                  <div key={dstId} className="h-8 w-8">
-                    <Button
-                      variant={isActive ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(
-                        'h-full w-full text-[8px] transition-all',
-                        isActive ? 'scale-105 shadow-sm' : 'hover:scale-105'
-                      )}
-                    >
-                      {srcId === dstId ? 'X' : '→'}
-                    </Button>
-                  </div>
-                )
-              })}
-            </React.Fragment>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 function DevicePanel() {
   const {
@@ -403,7 +348,7 @@ function DevicePanel() {
                 className="w-20"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-2">
               <Button
                 size="sm"
                 onClick={handleStartNetworkStream}
@@ -551,15 +496,16 @@ function App() {
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-bold">AsioBridge</h1>
           <div className="flex items-center gap-2">
-            <select
-              className="rounded border bg-background px-2 py-1 text-sm"
-              value={selectedProfile}
-              onChange={(e) => setSelectedProfile(Number(e.target.value))}
-            >
-              {Array.from({ length: 8 }, (_, i) => (
-                <option key={i} value={i}>Profile {i + 1}</option>
-              ))}
-            </select>
+            <Select value={selectedProfile.toString()} onValueChange={(v) => setSelectedProfile(Number(v))}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Profile" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <SelectItem key={i} value={i.toString()}>Profile {i + 1}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" onClick={handleSaveProfile}>Save</Button>
             <Button variant="outline" size="sm" onClick={handleLoadProfile}>Load</Button>
           </div>
@@ -568,7 +514,7 @@ function App() {
 
       <main className="p-4">
         <div className="mb-4 flex gap-2">
-          <Select>
+          <Select defaultValue="asio">
             <SelectTrigger className="w-64">
               <SelectValue placeholder="Select ASIO driver" />
             </SelectTrigger>
@@ -589,7 +535,7 @@ function App() {
               ))}
             </SelectContent>
           </Select>
-          <Select>
+          <Select defaultValue="24">
             <SelectTrigger className="w-24">
               <SelectValue placeholder="Bit depth" />
             </SelectTrigger>
@@ -601,23 +547,33 @@ function App() {
           </Select>
         </div>
 
-        <div className="mb-4 flex gap-4 overflow-x-auto pb-4">
-          {racks.map((rack) => (
-            <RackView key={rack.id} rack={rack} />
-          ))}
-        </div>
+        <Tabs defaultValue="racks">
+          <TabsList className="mb-4">
+            <TabsTrigger value="racks">Racks</TabsTrigger>
+            <TabsTrigger value="connections">Connections</TabsTrigger>
+            <TabsTrigger value="devices">Devices</TabsTrigger>
+          </TabsList>
 
-        {racks.find(r => r.id === 'mix-out') && (
-          <div className="mb-4">
-            <MixerView channels={racks.find(r => r.id === 'mix-out')!.channels} />
-          </div>
-        )}
+          <TabsContent value="racks" className="space-y-4">
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {racks.map((rack) => (
+                <RackView key={rack.id} rack={rack} />
+              ))}
+            </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-4">
-          <DevicePanel />
-        </div>
+            {racks.find(r => r.id === 'mix-out') && (
+              <MixerView channels={racks.find(r => r.id === 'mix-out')!.channels} />
+            )}
+          </TabsContent>
 
-        <ConnectionMatrix connections={connections} />
+          <TabsContent value="connections">
+            <ConnectionPanel connections={connections} />
+          </TabsContent>
+
+          <TabsContent value="devices">
+            <DevicePanel />
+          </TabsContent>
+        </Tabs>
       </main>
 
       <footer className="border-t bg-card px-4 py-2">

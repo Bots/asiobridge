@@ -166,7 +166,10 @@ fn main() {
                 engine.add_rack(rack);
             }
 
-            info!("AsioBridge initialized with {} racks", engine.get_racks().len());
+            info!(
+                "AsioBridge initialized with {} racks",
+                engine.get_racks().len()
+            );
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

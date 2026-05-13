@@ -1,7 +1,5 @@
-use asiobridge_core::{
-    AudioEngine, Connection, ConnectionType,
-};
 use crate::audio_manager::{AudioCommand, AudioManagerHandle};
+use asiobridge_core::{AudioEngine, Connection, ConnectionType};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::State;
@@ -63,7 +61,9 @@ pub fn get_racks(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<RackState
 }
 
 #[tauri::command]
-pub fn get_connections(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<ConnectionState>, String> {
+pub fn get_connections(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+) -> Result<Vec<ConnectionState>, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     let connections = engine.get_connections();
     let states: Vec<ConnectionState> = connections
@@ -230,9 +230,7 @@ pub struct EngineStatus {
 }
 
 #[tauri::command]
-pub fn get_engine_status(
-    engine: State<Arc<Mutex<AudioEngine>>>,
-) -> Result<EngineStatus, String> {
+pub fn get_engine_status(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<EngineStatus, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     Ok(EngineStatus {
         is_running: engine.is_running(),
@@ -262,9 +260,7 @@ pub fn start_network_stream(
 }
 
 #[tauri::command]
-pub fn stop_network_stream(
-    engine: State<Arc<Mutex<AudioEngine>>>,
-) -> Result<bool, String> {
+pub fn stop_network_stream(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<bool, String> {
     let mut engine = engine.lock().map_err(|e| e.to_string())?;
     engine.clear_network_streams();
     Ok(true)
@@ -276,9 +272,10 @@ pub fn get_network_stream_config(
 ) -> Result<NetworkStreamConfig, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     let streams = engine.get_network_streams();
-    let stream = streams.first().cloned().unwrap_or_else(|| {
-        asiobridge_core::NetworkStream::new("127.0.0.1".to_string(), 6997)
-    });
+    let stream = streams
+        .first()
+        .cloned()
+        .unwrap_or_else(|| asiobridge_core::NetworkStream::new("127.0.0.1".to_string(), 6997));
     Ok(NetworkStreamConfig {
         host: stream.host,
         port: stream.port,
@@ -310,7 +307,9 @@ pub fn stop_recording(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<bool, St
 }
 
 #[tauri::command]
-pub fn get_recording_status(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<RecordingStatus, String> {
+pub fn get_recording_status(
+    engine: State<Arc<Mutex<AudioEngine>>>,
+) -> Result<RecordingStatus, String> {
     let engine = engine.lock().map_err(|e| e.to_string())?;
     Ok(RecordingStatus {
         is_recording: false,
