@@ -409,3 +409,158 @@ impl AudioEngine {
         self.recorder.get_output_dir()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rack::{Channel, ChannelId, RackId};
+
+    fn create_test_engine() -> AudioEngine {
+        AudioEngine::new(44100, 24, 2)
+    }
+
+    fn create_test_rack(id: RackId, channel_count: usize) -> Rack {
+        Rack::new(
+            id,
+            (0..channel_count)
+                .map(|i| Channel {
+                    id: ChannelId(i as u32),
+                    name: format!("Ch {}", i),
+                    sample_rate: 44100,
+                    bit_depth: 24,
+                    is_active: true,
+                    level: 1.0,
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn test_engine_create() {
+        let engine = create_test_engine();
+        assert!(!engine.is_running());
+        assert_eq!(engine.get_sample_rate(), 44100);
+        assert_eq!(engine.get_bit_depth(), 24);
+        assert_eq!(engine.get_channel_count(), 2);
+    }
+
+    #[test]
+    fn test_engine_start_stop() {
+        let mut engine = create_test_engine();
+        engine.start();
+        assert!(engine.is_running());
+        engine.stop();
+        assert!(!engine.is_running());
+    }
+
+    #[test]
+    fn test_engine_double_start() {
+        let mut engine = create_test_engine();
+        engine.start();
+        engine.start(); // Should be no-op
+        assert!(engine.is_running());
+    }
+
+    #[test]
+    fn test_sample_rate_change() {
+        let mut engine = create_test_engine();
+        engine.set_sample_rate(48000);
+        assert_eq!(engine.get_sample_rate(), 48000);
+    }
+
+    #[test]
+    fn test_bit_depth_change() {
+        let mut engine = create_test_engine();
+        engine.set_bit_depth(16);
+        assert_eq!(engine.get_bit_depth(), 16);
+    }
+
+    #[test]
+    fn test_process_audio_stopped() {
+        let mut engine = create_test_engine();
+        let input = vec![0.5f32, 0.3];
+        let output = engine.process_audio(&input);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn test_process_audio_running() {
+        let mut engine = create_test_engine();
+        engine.start();
+        let input = vec![0.5f32, 0.3];
+        let output = engine.process_audio(&input);
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn test_level_tracking() {
+        let mut engine = create_test_engine();
+        engine.start();
+        engine.add_rack(create_test_rack(RackId::AsioDriverIn, 2));
+        engine.add_rack(create_test_rack(RackId::MixOut, 2));
+        engine.add_connection(Connection {
+            source_rack: "ASIO Driver IN".to_string(),
+            source_channel: 0,
+            dest_rack: "Mix OUT".to_string(),
+            dest_channel: 0,
+            connection_type: ConnectionType::Direct,
+            is_active: true,
+        });
+
+        // Send a strong signal
+        for _ in 0..100 {
+            engine.process_audio(&[0.8, 0.5]);
+        }
+
+        let levels = engine.get_channel_levels();
+        let ch0_level = levels.get(&("ASIO Driver IN".to_string(), 0));
+        assert!(ch0_level.is_some(), "Level should be tracked for source channel");
+        assert!(ch0_level.unwrap().peak > 0.5, "Peak should be > 0.5");
+    }
+
+    #[test]
+    fn test_level_decay() {
+        let mut engine = create_test_engine();
+        engine.start();
+
+        // Send a signal
+        engine.process_audio(&[0.9, 0.0]);
+
+        let levels = engine.get_channel_levels();
+        let initial_peak = levels.get(&("input".to_string(), 0)).unwrap().peak;
+        assert!(initial_peak > 0.5);
+
+        // Send silence and check decay
+        for _ in 0..500 {
+            engine.process_audio(&[0.0, 0.0]);
+        }
+
+        let levels = engine.get_channel_levels();
+        let decayed_peak = levels.get(&("input".to_string(), 0)).unwrap().peak;
+        assert!(decayed_peak < initial_peak);
+    }
+
+    #[test]
+    fn test_recording_start_stop() {
+        let mut engine = create_test_engine();
+        assert!(!engine.is_recording());
+        assert!(engine.start_recording());
+        assert!(engine.is_recording());
+        assert!(engine.stop_recording());
+        assert!(!engine.is_recording());
+    }
+
+    #[test]
+    fn test_recording_double_start() {
+        let mut engine = create_test_engine();
+        assert!(engine.start_recording());
+        assert!(!engine.start_recording()); // Should fail
+    }
+
+    #[test]
+    fn test_channel_level_new() {
+        let level = ChannelLevel::new();
+        assert_eq!(level.rms, 0.0);
+        assert_eq!(level.peak, 0.0);
+    }
+}
