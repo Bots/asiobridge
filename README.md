@@ -9,7 +9,7 @@ Modern replacement for ASIO Link Pro — virtual ASIO driver and audio routing a
 - Multi-client mode (share ASIO driver across 25+ apps)
 - Network audio streaming (UDP between AsioBridge instances)
 - VST3 plugin hosting and routing
-- 8-channel FLAC recording
+- Multi-channel WAV recording (i16, real-time)
 - Mapping matrix routing with per-channel controls
 - 8 profile slots for saving/restoring configurations
 
@@ -19,15 +19,19 @@ Modern replacement for ASIO Link Pro — virtual ASIO driver and audio routing a
 ┌─────────────────────────────────────┐
 │  AsioBridge App (Tauri 2 + React)  │
 └──────────────┬──────────────────────┘
-               │ Tauri IPC (Rust)
+                │ Tauri IPC (Rust)
 ┌──────────────┴──────────────────────┐
 │  Audio Engine (Rust)                │
+│  ├─ Mixer & Resampler               │
+│  ├─ Level Metering (RMS + Peak)     │
+│  ├─ WAV Recording                   │
+│  └─ Network Streaming (UDP)         │
 └──────────────┬──────────────────────┘
-               │
+                │
 ┌──────────────┴──────────────────────┐
 │  ASIO Driver (C++ COM)              │
 └──────────────┬──────────────────────┘
-               │
+                │
 ┌──────────────┴──────────────────────┐
 │  Virtual Audio Driver (WDK)         │
 └─────────────────────────────────────┘
