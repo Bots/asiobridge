@@ -130,7 +130,7 @@ function MixerView({ channels }: { channels: RackState['channels'] }) {
               <span className="text-[10px] text-muted-foreground">{channel.name}</span>
               <div className="relative h-48 w-8 rounded-lg bg-muted p-1">
                 <div className="absolute bottom-0 left-0 right-0 rounded-sm bg-gradient-to-t from-green-500 via-yellow-400 to-red-500 transition-all"
-                  style={{ height: `${channel.level * 100}%` }}
+                  style={{ height: `${channel.peak * 100}%` }}
                 />
                 <input
                   type="range"
