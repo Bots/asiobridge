@@ -37,3 +37,7 @@ Thumbs.db
 .env.local
 *.p12
 *.pfx
+
+# Generated data
+recordings/
+profiles/
