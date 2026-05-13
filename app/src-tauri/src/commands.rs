@@ -55,7 +55,7 @@ pub fn get_racks(engine: State<Arc<Mutex<AudioEngine>>>) -> Result<Vec<RackState
                     let cl = levels
                         .get(&(rack_id.clone(), i as u32))
                         .copied()
-                        .unwrap_or(asiobridge_core::ChannelLevel::new());
+                        .unwrap_or_default();
                     ChannelState {
                         id: ch.id.0,
                         name: ch.name.clone(),

@@ -1,54 +1,7 @@
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::{BufWriter, Seek, Write};
 use std::path::PathBuf;
 use tracing::{error, info};
-
-/// WAV file header structure
-struct WavHeader {
-    sample_rate: u32,
-    channels: u16,
-    bit_depth: u16,
-    num_frames: u32,
-}
-
-impl WavHeader {
-    fn new(sample_rate: u32, channels: u16, bit_depth: u16, num_frames: u32) -> Self {
-        Self {
-            sample_rate,
-            channels,
-            bit_depth,
-            num_frames,
-        }
-    }
-
-    fn write_to<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        let bytes_per_sample = (self.bit_depth as u32) / 8;
-        let data_size = (self.num_frames as u64)
-            * (self.channels as u64)
-            * (bytes_per_sample as u64);
-        let file_size = 36 + data_size;
-
-        writer.write_all(b"RIFF")?;
-        writer.write_all(&(file_size as u32).to_le_bytes())?;
-        writer.write_all(b"WAVE")?;
-
-        writer.write_all(b"fmt ")?;
-        writer.write_all(&16u32.to_le_bytes())?;
-        writer.write_all(&1u16.to_le_bytes())?;
-        writer.write_all(&self.channels.to_le_bytes())?;
-        writer.write_all(&self.sample_rate.to_le_bytes())?;
-        writer.write_all(
-            &(self.sample_rate * bytes_per_sample * self.channels as u32).to_le_bytes(),
-        )?;
-        writer.write_all(&((bytes_per_sample as u16) * self.channels).to_le_bytes())?;
-        writer.write_all(&self.bit_depth.to_le_bytes())?;
-
-        writer.write_all(b"data")?;
-        writer.write_all(&(data_size as u32).to_le_bytes())?;
-
-        Ok(())
-    }
-}
 
 /// Audio recorder that writes to WAV files
 pub struct AudioRecorder {
@@ -108,15 +61,43 @@ impl AudioRecorder {
             return false;
         }
 
+        let num_frames = self.samples_written / (self.channels as u32);
+        let bytes_per_sample = (self.bit_depth as u32) / 8;
+        let data_size = (num_frames as u64)
+            * (self.channels as u64)
+            * (bytes_per_sample as u64);
+        let file_size = 36 + data_size;
+
+        if let Some(mut writer) = self.writer.take() {
+            // Write WAV header at the beginning of the file
+            let _ = writer.seek(std::io::SeekFrom::Start(0));
+
+            let mut buf = Vec::with_capacity(44);
+            buf.extend_from_slice(b"RIFF");
+            buf.extend_from_slice(&(file_size as u32).to_le_bytes());
+            buf.extend_from_slice(b"WAVE");
+            buf.extend_from_slice(b"fmt ");
+            buf.extend_from_slice(&16u32.to_le_bytes());
+            buf.extend_from_slice(&1u16.to_le_bytes());
+            buf.extend_from_slice(&self.channels.to_le_bytes());
+            buf.extend_from_slice(&self.sample_rate.to_le_bytes());
+            buf.extend_from_slice(
+                &(self.sample_rate * bytes_per_sample * self.channels as u32).to_le_bytes(),
+            );
+            buf.extend_from_slice(&((bytes_per_sample as u16) * self.channels).to_le_bytes());
+            buf.extend_from_slice(&self.bit_depth.to_le_bytes());
+            buf.extend_from_slice(b"data");
+            buf.extend_from_slice(&(data_size as u32).to_le_bytes());
+
+            let _ = writer.write_all(&buf);
+            let _ = writer.flush();
+        }
+
         info!(
             "Stopping recording: {} frames, {} ch, {}Hz, {}bit",
-            self.samples_written,
-            self.channels,
-            self.sample_rate,
-            self.bit_depth
+            num_frames, self.channels, self.sample_rate, self.bit_depth
         );
 
-        self.writer.take();
         self.is_recording = false;
         true
     }

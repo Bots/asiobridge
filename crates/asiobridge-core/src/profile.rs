@@ -29,6 +29,12 @@ pub struct ProfileManager {
     dir: PathBuf,
 }
 
+impl Default for ProfileManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProfileManager {
     pub fn new() -> Self {
         let dir = PathBuf::from("profiles");

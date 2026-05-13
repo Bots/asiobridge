@@ -1,6 +1,7 @@
 /// Audio resampler — simple linear interpolation for now
 /// TODO: Full rubato integration once Steinberg ASIO SDK is available
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Resampler {
     from_rate: u32,
     to_rate: u32,
@@ -25,15 +26,15 @@ impl Resampler {
         let output_len = (input.len() as f32 * ratio) as usize;
         let mut output = vec![0.0f32; output_len];
 
-        for i in 0..output_len {
+        for (i, out_sample) in output.iter_mut().enumerate() {
             let src_pos = i as f32 / ratio;
             let idx = src_pos as usize;
             let frac = src_pos - idx as f32;
 
             if idx + 1 < input.len() {
-                output[i] = input[idx] * (1.0 - frac) + input[idx + 1] * frac;
+                *out_sample = input[idx] * (1.0 - frac) + input[idx + 1] * frac;
             } else if idx < input.len() {
-                output[i] = input[idx];
+                *out_sample = input[idx];
             }
         }
 

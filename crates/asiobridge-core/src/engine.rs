@@ -17,8 +17,8 @@ pub struct ChannelLevel {
     pub peak: f32,
 }
 
-impl ChannelLevel {
-    pub fn new() -> Self {
+impl Default for ChannelLevel {
+    fn default() -> Self {
         Self { rms: 0.0, peak: 0.0 }
     }
 }
@@ -230,8 +230,10 @@ impl AudioEngine {
         if !network_audio.is_empty() {
             if let Some(rack) = self.racks.get_mut("network-in") {
                 let channels_to_fill = std::cmp::min(network_audio.len(), rack.channels.len());
-                for i in 0..channels_to_fill {
-                    rack.channels[i].level = network_audio[i];
+                for (idx, ch) in rack.channels.iter_mut().enumerate().take(channels_to_fill) {
+                    if idx < network_audio.len() {
+                        ch.level = network_audio[idx];
+                    }
                 }
             }
         }
@@ -250,7 +252,7 @@ impl AudioEngine {
                 let entry = self
                     .channel_levels
                     .entry(("input".to_string(), i as u32))
-                    .or_insert_with(ChannelLevel::new);
+                    .or_default();
                 entry.peak = entry.peak.max(abs);
                 entry.rms = (entry.rms * entry.rms + abs * abs) * 0.5_f32;
                 entry.rms = entry.rms.sqrt();
@@ -311,7 +313,7 @@ impl AudioEngine {
                         let entry = self
                             .channel_levels
                             .entry((connection.source_rack.clone(), connection.source_channel))
-                            .or_insert_with(ChannelLevel::new);
+                            .or_default();
                         entry.peak = entry.peak.max(abs);
                         entry.rms = (entry.rms * entry.rms + abs * abs) * 0.5_f32;
                         entry.rms = entry.rms.sqrt();
@@ -322,16 +324,18 @@ impl AudioEngine {
                     continue;
                 }
                 ConnectionType::MultiClient => {
-                    for i in 0..std::cmp::min(input.len(), num_channels) {
-                        let abs = input[i % input.len()].abs();
+                    let limit = std::cmp::min(input.len(), num_channels);
+                    for (idx, out_sample) in output.iter_mut().take(limit).enumerate() {
+                        let in_sample = input[idx % input.len()];
+                        let abs = in_sample.abs();
                         let entry = self
                             .channel_levels
                             .entry((connection.source_rack.clone(), connection.source_channel))
-                            .or_insert_with(ChannelLevel::new);
+                            .or_default();
                         entry.peak = entry.peak.max(abs);
                         entry.rms = (entry.rms * entry.rms + abs * abs) * 0.5_f32;
                         entry.rms = entry.rms.sqrt();
-                        output[i] += input[i % input.len()] * gain;
+                        *out_sample += in_sample * gain;
                     }
                 }
             }
@@ -558,8 +562,8 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_level_new() {
-        let level = ChannelLevel::new();
+    fn test_channel_level_default() {
+        let level = ChannelLevel::default();
         assert_eq!(level.rms, 0.0);
         assert_eq!(level.peak, 0.0);
     }
